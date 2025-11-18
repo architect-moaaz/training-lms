@@ -6,10 +6,11 @@ A full-stack web-based Learning Management System where users can register, logi
 
 - **Backend**: Python with Flask
 - **Frontend**: React with TypeScript
-- **Database**: SQLite
-- **Notebook Execution**: Pyodide (browser-based Python execution)
+- **Database**: SQLite (PostgreSQL for production)
+- **Notebook Execution**: Server-side Jupyter kernel with LangChain support
 - **PDF Viewer**: react-pdf
 - **Authentication**: JWT tokens with bcrypt
+- **Deployment**: Railway (backend), Vercel/Netlify (frontend)
 
 ## Project Structure
 
@@ -207,3 +208,30 @@ gunicorn app:app
 ## License
 
 MIT License
+
+## Deployment
+
+### Quick Deploy to Railway
+
+See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) for detailed deployment instructions.
+
+**Quick Steps:**
+1. Push code to GitHub
+2. Create a Railway account
+3. Deploy from GitHub repository
+4. Set environment variables
+5. Deploy frontend to Vercel/Netlify
+
+### Environment Variables
+
+**Backend (Railway):**
+- `SECRET_KEY` - Flask secret key
+- `JWT_SECRET_KEY` - JWT signing key
+- `FLASK_ENV` - Set to "production"
+- `PUBLIC_FOLDER` - Path to content folder
+- `DATABASE_URL` - PostgreSQL connection string (optional)
+
+**Frontend (Vercel/Netlify):**
+- `REACT_APP_API_URL` - Backend API URL
+
+For more details, see [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md)

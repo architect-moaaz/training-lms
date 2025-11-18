@@ -13,3 +13,4 @@ langchain-openai==1.0.3
 langchain-core==1.0.5
 pydantic==2.12.4
 openai==2.8.1
+gunicorn==21.2.0
