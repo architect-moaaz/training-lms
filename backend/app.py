@@ -17,8 +17,15 @@ app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key-
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Configure CORS - allow frontend URL from environment or localhost
+allowed_origins = [
+    os.environ.get('FRONTEND_URL', 'http://localhost:3001'),
+    'http://localhost:3001',
+    'http://localhost:3000'
+]
+
 # Initialize extensions
-CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
 jwt = JWTManager(app)
 db.init_app(app)
 
