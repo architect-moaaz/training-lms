@@ -1,0 +1,110 @@
+.pdf-viewer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #525659;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.pdf-header {
+  background: white;
+  padding: 1rem 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pdf-title h2 {
+  font-size: 1.5rem;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.pdf-controls {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.zoom-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.zoom-controls button {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  min-width: 36px;
+  transition: background 0.2s;
+}
+
+.zoom-controls button:hover:not(:disabled) {
+  background: #2980b9;
+}
+
+.zoom-level {
+  min-width: 50px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.page-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.page-controls button {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.page-controls button:hover:not(:disabled) {
+  background: #2980b9;
+}
+
+.page-info {
+  min-width: 100px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.pdf-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem;
+}
+
+.pdf-content .react-pdf__Document {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pdf-content .react-pdf__Page {
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  background: white;
+}
+
+.pdf-content canvas {
+  max-width: 100%;
+  height: auto !important;
+}
