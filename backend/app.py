@@ -21,11 +21,16 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 allowed_origins = [
     os.environ.get('FRONTEND_URL', 'http://localhost:3001'),
     'http://localhost:3001',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'https://training-lms-production-f822.up.railway.app'
 ]
 
 # Initialize extensions
-CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
+CORS(app, resources={r"/api/*": {
+    "origins": allowed_origins,
+    "allow_headers": ["Content-Type", "Authorization"],
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+}}, supports_credentials=True)
 jwt = JWTManager(app)
 db.init_app(app)
 
