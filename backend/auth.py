@@ -1,4 +1,5 @@
 import bcrypt
+import requests
 from flask_jwt_extended import create_access_token, create_refresh_token
 from models import db, User
 from datetime import datetime
@@ -15,7 +16,26 @@ def verify_password(password, password_hash):
     return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
 
 
-def register_user(username, email, password):
+def get_location_from_ip(ip_address):
+    """Get location information from IP address using ip-api.com (free)"""
+    if not ip_address or ip_address == '127.0.0.1' or ip_address.startswith('192.168'):
+        return {'country': 'Local', 'city': 'Local'}
+
+    try:
+        response = requests.get(f'http://ip-api.com/json/{ip_address}', timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                'country': data.get('country', 'Unknown'),
+                'city': data.get('city', 'Unknown')
+            }
+    except Exception as e:
+        print(f"Error fetching location for IP {ip_address}: {e}")
+
+    return {'country': 'Unknown', 'city': 'Unknown'}
+
+
+def register_user(username, email, password, ip_address=None):
     """Register a new user"""
     # Check if user already exists
     if User.query.filter_by(email=email).first():
@@ -34,12 +54,18 @@ def register_user(username, email, password):
     if not password or len(password) < 6:
         return {'error': 'Password must be at least 6 characters'}, 400
 
+    # Get location from IP
+    location = get_location_from_ip(ip_address) if ip_address else {'country': 'Unknown', 'city': 'Unknown'}
+
     # Create new user
     password_hash = hash_password(password)
     new_user = User(
         username=username,
         email=email,
-        password_hash=password_hash
+        password_hash=password_hash,
+        registration_ip=ip_address,
+        registration_country=location.get('country'),
+        registration_city=location.get('city')
     )
 
     db.session.add(new_user)

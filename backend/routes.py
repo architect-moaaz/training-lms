@@ -19,7 +19,13 @@ def register():
     email = data.get('email')
     password = data.get('password')
 
-    result, status_code = register_user(username, email, password)
+    # Get client IP address
+    if request.headers.getlist("X-Forwarded-For"):
+        ip_address = request.headers.getlist("X-Forwarded-For")[0]
+    else:
+        ip_address = request.remote_addr
+
+    result, status_code = register_user(username, email, password, ip_address)
     return jsonify(result), status_code
 
 
@@ -270,3 +276,180 @@ def restart_kernel():
         return jsonify({'success': True, 'message': 'Kernel restarted successfully'}), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ========== PAGE TIME TRACKING ==========
+
+@api.route('/track/page', methods=['POST'])
+@jwt_required()
+def track_page_time():
+    """Track time spent on a page"""
+    from models import PageTimeTracking
+
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+
+    page_url = data.get('page_url')
+    page_title = data.get('page_title')
+    time_spent = data.get('time_spent', 0)  # in seconds
+
+    if not page_url:
+        return jsonify({'error': 'page_url is required'}), 400
+
+    # Find or create page tracking record
+    tracking = PageTimeTracking.query.filter_by(
+        user_id=user_id,
+        page_url=page_url
+    ).first()
+
+    if tracking:
+        tracking.time_spent += time_spent
+        tracking.visit_count += 1
+        tracking.last_visited = datetime.utcnow()
+    else:
+        tracking = PageTimeTracking(
+            user_id=user_id,
+            page_url=page_url,
+            page_title=page_title,
+            time_spent=time_spent
+        )
+        db.session.add(tracking)
+
+    db.session.commit()
+
+    return jsonify({'success': True, 'tracking': tracking.to_dict()}), 200
+
+
+@api.route('/track/pages', methods=['GET'])
+@jwt_required()
+def get_user_page_tracking():
+    """Get user's page tracking data"""
+    from models import PageTimeTracking
+
+    user_id = int(get_jwt_identity())
+
+    tracking_data = PageTimeTracking.query.filter_by(user_id=user_id).all()
+
+    return jsonify({
+        'tracking': [t.to_dict() for t in tracking_data],
+        'total_pages': len(tracking_data),
+        'total_time': sum(t.time_spent for t in tracking_data)
+    }), 200
+
+
+# ========== ADMIN ROUTES ==========
+
+def admin_required():
+    """Decorator to require admin privileges"""
+    def wrapper(fn):
+        @jwt_required()
+        def decorator(*args, **kwargs):
+            user_id = int(get_jwt_identity())
+            user = User.query.get(user_id)
+
+            if not user or not user.is_admin:
+                return jsonify({'error': 'Admin privileges required'}), 403
+
+            return fn(*args, **kwargs)
+        decorator.__name__ = fn.__name__
+        return decorator
+    return wrapper
+
+
+@api.route('/admin/users', methods=['GET'])
+@admin_required()
+def get_all_users():
+    """Get all users with detailed information (admin only)"""
+    from models import PageTimeTracking
+
+    users = User.query.all()
+
+    users_data = []
+    for user in users:
+        user_dict = user.to_dict(include_sensitive=True)
+
+        # Add page tracking stats
+        page_tracks = PageTimeTracking.query.filter_by(user_id=user.id).all()
+        user_dict['total_pages_visited'] = len(page_tracks)
+        user_dict['total_time_spent'] = sum(t.time_spent for t in page_tracks)
+
+        # Add progress stats
+        user_dict['total_days_progress'] = len(user.progress)
+        user_dict['completed_days'] = sum(1 for p in user.progress if p.completed)
+
+        users_data.append(user_dict)
+
+    return jsonify({
+        'users': users_data,
+        'total_users': len(users_data)
+    }), 200
+
+
+@api.route('/admin/users/<int:user_id>', methods=['GET'])
+@admin_required()
+def get_user_details(user_id):
+    """Get detailed information about a specific user (admin only)"""
+    from models import PageTimeTracking
+
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    user_dict = user.to_dict(include_sensitive=True)
+
+    # Get page tracking data
+    page_tracks = PageTimeTracking.query.filter_by(user_id=user_id).all()
+    user_dict['page_tracking'] = [t.to_dict() for t in page_tracks]
+    user_dict['total_pages_visited'] = len(page_tracks)
+    user_dict['total_time_spent'] = sum(t.time_spent for t in page_tracks)
+
+    # Get progress data
+    user_dict['progress'] = [p.to_dict() for p in user.progress]
+    user_dict['total_days_progress'] = len(user.progress)
+    user_dict['completed_days'] = sum(1 for p in user.progress if p.completed)
+
+    return jsonify(user_dict), 200
+
+
+@api.route('/admin/users/<int:user_id>/reset-password', methods=['POST'])
+@admin_required()
+def admin_reset_password(user_id):
+    """Reset a user's password (admin only)"""
+    from auth import hash_password
+
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    data = request.get_json()
+    new_password = data.get('new_password')
+
+    if not new_password or len(new_password) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+
+    user.password_hash = hash_password(new_password)
+    db.session.commit()
+
+    return jsonify({'success': True, 'message': 'Password reset successfully'}), 200
+
+
+@api.route('/admin/users/<int:user_id>', methods=['DELETE'])
+@admin_required()
+def delete_user(user_id):
+    """Delete a user (admin only)"""
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    # Prevent self-deletion
+    current_user_id = int(get_jwt_identity())
+    if user_id == current_user_id:
+        return jsonify({'error': 'Cannot delete your own account'}), 400
+
+    db.session.delete(user)
+    db.session.commit()
+
+    return jsonify({'success': True, 'message': 'User deleted successfully'}), 200
