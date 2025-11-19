@@ -21,9 +21,24 @@ class RedisKernelManager:
     """
 
     def __init__(self):
-        # Connect to Redis
-        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
-        self.redis_client = redis.from_url(redis_url, decode_responses=True)
+        # Try to connect to Redis, but fall back gracefully if not available
+        redis_url = os.environ.get('REDIS_URL')
+        self.redis_available = False
+        self.redis_client = None
+
+        if redis_url:
+            try:
+                self.redis_client = redis.from_url(redis_url, decode_responses=True)
+                # Test connection
+                self.redis_client.ping()
+                self.redis_available = True
+                print(f"✓ Redis connected successfully")
+            except Exception as e:
+                print(f"⚠ Redis connection failed: {e}")
+                print(f"⚠ Falling back to in-memory kernel storage (single worker mode)")
+                self.redis_client = None
+        else:
+            print(f"⚠ REDIS_URL not set, using in-memory kernel storage (single worker mode)")
 
         # Local kernel storage (in-memory for this worker)
         self.local_kernels = {}
@@ -42,26 +57,35 @@ class RedisKernelManager:
                 print(f"Worker {self.worker_id}: Using existing local kernel for user {user_id}")
                 return self.local_kernels[user_id]
 
-            # Check Redis to see if another worker has this user's kernel
-            redis_key = f"kernel:user:{user_id}"
-            stored_worker = self.redis_client.get(redis_key)
+            # Check Redis only if available
+            if self.redis_available and self.redis_client:
+                try:
+                    redis_key = f"kernel:user:{user_id}"
+                    stored_worker = self.redis_client.get(redis_key)
 
-            if stored_worker:
-                if str(stored_worker) == str(self.worker_id):
-                    # This worker should have it but doesn't (maybe restarted)
-                    print(f"Worker {self.worker_id}: Recreating kernel for user {user_id}")
-                else:
-                    # Another worker has it, but we'll create our own
-                    print(f"Worker {self.worker_id}: Creating new kernel for user {user_id} (was on worker {stored_worker})")
-            else:
-                print(f"Worker {self.worker_id}: Creating first kernel for user {user_id}")
+                    if stored_worker:
+                        if str(stored_worker) == str(self.worker_id):
+                            # This worker should have it but doesn't (maybe restarted)
+                            print(f"Worker {self.worker_id}: Recreating kernel for user {user_id}")
+                        else:
+                            # Another worker has it, but we'll create our own
+                            print(f"Worker {self.worker_id}: Creating new kernel for user {user_id} (was on worker {stored_worker})")
+                    else:
+                        print(f"Worker {self.worker_id}: Creating first kernel for user {user_id}")
+                except Exception as e:
+                    print(f"⚠ Redis error in get_kernel: {e}, continuing without Redis")
 
             # Create new kernel
             kernel = NotebookExecutor()
             self.local_kernels[user_id] = kernel
 
-            # Store in Redis that this worker owns this user's kernel
-            self.redis_client.set(redis_key, self.worker_id, ex=3600)  # Expire after 1 hour
+            # Store in Redis that this worker owns this user's kernel (if available)
+            if self.redis_available and self.redis_client:
+                try:
+                    redis_key = f"kernel:user:{user_id}"
+                    self.redis_client.set(redis_key, self.worker_id, ex=3600)  # Expire after 1 hour
+                except Exception as e:
+                    print(f"⚠ Redis error storing kernel info: {e}")
 
             return kernel
 
@@ -77,9 +101,13 @@ class RedisKernelManager:
                 kernel = NotebookExecutor()
                 self.local_kernels[user_id] = kernel
 
-                # Update Redis
-                redis_key = f"kernel:user:{user_id}"
-                self.redis_client.set(redis_key, self.worker_id, ex=3600)
+                # Update Redis (if available)
+                if self.redis_available and self.redis_client:
+                    try:
+                        redis_key = f"kernel:user:{user_id}"
+                        self.redis_client.set(redis_key, self.worker_id, ex=3600)
+                    except Exception as e:
+                        print(f"⚠ Redis error in restart_kernel: {e}")
 
     def cleanup_user_kernel(self, user_id):
         """Clean up a user's kernel (called on logout or timeout)"""
@@ -88,9 +116,13 @@ class RedisKernelManager:
                 print(f"Worker {self.worker_id}: Cleaning up kernel for user {user_id}")
                 del self.local_kernels[user_id]
 
-            # Remove from Redis
-            redis_key = f"kernel:user:{user_id}"
-            self.redis_client.delete(redis_key)
+            # Remove from Redis (if available)
+            if self.redis_available and self.redis_client:
+                try:
+                    redis_key = f"kernel:user:{user_id}"
+                    self.redis_client.delete(redis_key)
+                except Exception as e:
+                    print(f"⚠ Redis error in cleanup: {e}")
 
     def get_stats(self):
         """Get statistics about kernel usage"""
