@@ -41,7 +41,13 @@ def login():
 @jwt_required()
 def get_days():
     """Get all available days with content metadata"""
-    public_folder = os.environ.get('PUBLIC_FOLDER', '../public')
+    # Check if running in Railway (use local public folder) or locally (use parent public folder)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    public_folder = os.environ.get('PUBLIC_FOLDER', os.path.join(base_dir, 'public'))
+
+    # Fallback to parent directory public folder if local one doesn't exist
+    if not os.path.exists(public_folder):
+        public_folder = os.path.join(os.path.dirname(base_dir), 'public')
 
     if not os.path.exists(public_folder):
         return jsonify({'error': 'Content not available'}), 404
@@ -91,7 +97,11 @@ def get_days():
 @jwt_required()
 def get_day_content(day_number):
     """Get content for a specific day"""
-    public_folder = os.environ.get('PUBLIC_FOLDER', '../public')
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    public_folder = os.environ.get('PUBLIC_FOLDER', os.path.join(base_dir, 'public'))
+    if not os.path.exists(public_folder):
+        public_folder = os.path.join(os.path.dirname(base_dir), 'public')
+
     day_folder = os.path.join(public_folder, f'day{day_number}')
 
     if not os.path.exists(day_folder):
@@ -136,7 +146,11 @@ def get_day_content(day_number):
 @jwt_required()
 def get_notebook(day_number, filename):
     """Get notebook content"""
-    public_folder = os.environ.get('PUBLIC_FOLDER', '../public')
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    public_folder = os.environ.get('PUBLIC_FOLDER', os.path.join(base_dir, 'public'))
+    if not os.path.exists(public_folder):
+        public_folder = os.path.join(os.path.dirname(base_dir), 'public')
+
     notebook_path = os.path.join(public_folder, f'day{day_number}', filename)
 
     # Security: validate filename to prevent directory traversal
@@ -156,7 +170,11 @@ def get_notebook(day_number, filename):
 @jwt_required()
 def get_pdf(day_number, filename):
     """Stream PDF file"""
-    public_folder = os.environ.get('PUBLIC_FOLDER', '../public')
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    public_folder = os.environ.get('PUBLIC_FOLDER', os.path.join(base_dir, 'public'))
+    if not os.path.exists(public_folder):
+        public_folder = os.path.join(os.path.dirname(base_dir), 'public')
+
     pdf_path = os.path.join(public_folder, f'day{day_number}', filename)
 
     # Security: validate filename to prevent directory traversal
