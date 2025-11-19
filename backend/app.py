@@ -1,4 +1,5 @@
 import os
+from urllib.parse import quote_plus
 from flask import Flask
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
@@ -17,8 +18,25 @@ app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key-
 
 # Database configuration - handle Railway's postgres:// vs SQLAlchemy's postgresql://
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
+
+# Handle postgres:// to postgresql:// conversion for SQLAlchemy
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+# Handle special characters in password (e.g., # symbol)
+# Parse and re-encode the URL to handle special characters properly
+if database_url.startswith('postgresql://'):
+    try:
+        # Extract parts: postgresql://user:password@host:port/database
+        import re
+        match = re.match(r'postgresql://([^:]+):([^@]+)@(.+)', database_url)
+        if match:
+            user, password, rest = match.groups()
+            # URL encode the password to handle special characters
+            encoded_password = quote_plus(password)
+            database_url = f'postgresql://{user}:{encoded_password}@{rest}'
+    except Exception as e:
+        print(f"Warning: Could not parse database URL: {e}")
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
