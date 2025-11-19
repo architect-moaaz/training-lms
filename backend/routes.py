@@ -8,7 +8,10 @@ from datetime import datetime
 from notebook_executor import NotebookExecutor
 
 api = Blueprint('api', __name__)
-notebook_executor = NotebookExecutor()
+
+# Dictionary to store per-user notebook executors
+# Key: user_id, Value: NotebookExecutor instance
+user_kernels = {}
 
 
 @api.route('/auth/register', methods=['POST'])
@@ -257,13 +260,18 @@ def get_current_user():
 @jwt_required()
 def execute_cell():
     """Execute a notebook cell on the server"""
+    user_id = int(get_jwt_identity())
     data = request.get_json()
     code = data.get('code')
 
     if not code:
         return jsonify({'error': 'No code provided'}), 400
 
-    result = notebook_executor.execute_cell(code)
+    # Get or create a notebook executor for this user
+    if user_id not in user_kernels:
+        user_kernels[user_id] = NotebookExecutor()
+
+    result = user_kernels[user_id].execute_cell(code)
     return jsonify(result), 200
 
 
@@ -271,8 +279,15 @@ def execute_cell():
 @jwt_required()
 def restart_kernel():
     """Restart the Jupyter kernel to clear all state"""
+    user_id = int(get_jwt_identity())
+
     try:
-        notebook_executor.restart_kernel()
+        # Get or create a notebook executor for this user
+        if user_id not in user_kernels:
+            user_kernels[user_id] = NotebookExecutor()
+        else:
+            user_kernels[user_id].restart_kernel()
+
         return jsonify({'success': True, 'message': 'Kernel restarted successfully'}), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
