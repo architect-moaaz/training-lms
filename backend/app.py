@@ -17,29 +17,41 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-i
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key-change-in-production')
 
 # Database configuration - handle Railway's postgres:// vs SQLAlchemy's postgresql://
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
+database_url = os.environ.get('DATABASE_URL', '').strip()
 
-# Handle postgres:// to postgresql:// conversion for SQLAlchemy
-if database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+# If DATABASE_URL is empty or not set, use SQLite
+if not database_url:
+    database_url = 'sqlite:///database.db'
+    print("No DATABASE_URL found, using SQLite")
+else:
+    print(f"DATABASE_URL detected (length: {len(database_url)})")
 
-# Handle special characters in password (e.g., # symbol)
-# Parse and re-encode the URL to handle special characters properly
-if database_url.startswith('postgresql://'):
-    try:
-        # Extract parts: postgresql://user:password@host:port/database
-        import re
-        match = re.match(r'postgresql://([^:]+):([^@]+)@(.+)', database_url)
-        if match:
-            user, password, rest = match.groups()
-            # URL encode the password to handle special characters
-            encoded_password = quote_plus(password)
-            database_url = f'postgresql://{user}:{encoded_password}@{rest}'
-    except Exception as e:
-        print(f"Warning: Could not parse database URL: {e}")
+    # Handle postgres:// to postgresql:// conversion for SQLAlchemy
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        print("Converted postgres:// to postgresql://")
+
+    # Handle special characters in password (e.g., # symbol)
+    # Parse and re-encode the URL to handle special characters properly
+    if database_url.startswith('postgresql://'):
+        try:
+            # Extract parts: postgresql://user:password@host:port/database
+            import re
+            match = re.match(r'postgresql://([^:]+):([^@]+)@(.+)', database_url)
+            if match:
+                user, password, rest = match.groups()
+                # URL encode the password to handle special characters
+                encoded_password = quote_plus(password)
+                database_url = f'postgresql://{user}:{encoded_password}@{rest}'
+                print("Password encoded for special characters")
+            else:
+                print("Warning: Could not extract password from DATABASE_URL")
+        except Exception as e:
+            print(f"Warning: Could not parse database URL: {e}")
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+print(f"Final database URI scheme: {database_url.split(':')[0] if database_url else 'none'}")
 
 # Configure CORS - allow frontend URL from environment or localhost
 allowed_origins = [
