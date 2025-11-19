@@ -67,10 +67,14 @@ def health():
     return {'status': 'healthy'}, 200
 
 
-# Create tables
+# Create tables - with error handling for database connectivity issues
 with app.app_context():
-    db.create_all()
-    print("Database tables created successfully")
+    try:
+        db.create_all()
+        print("Database tables created successfully")
+    except Exception as e:
+        print(f"Warning: Could not create database tables: {e}")
+        print("Database will be initialized on first request")
 
 
 if __name__ == '__main__':
