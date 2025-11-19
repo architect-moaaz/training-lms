@@ -339,25 +339,25 @@ def get_user_page_tracking():
 
 # ========== ADMIN ROUTES ==========
 
-def admin_required():
+def admin_required(fn):
     """Decorator to require admin privileges"""
-    def wrapper(fn):
-        @jwt_required()
-        def decorator(*args, **kwargs):
-            user_id = int(get_jwt_identity())
-            user = User.query.get(user_id)
+    from functools import wraps
 
-            if not user or not user.is_admin:
-                return jsonify({'error': 'Admin privileges required'}), 403
+    @wraps(fn)
+    @jwt_required()
+    def wrapper(*args, **kwargs):
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
 
-            return fn(*args, **kwargs)
-        decorator.__name__ = fn.__name__
-        return decorator
+        if not user or not user.is_admin:
+            return jsonify({'error': 'Admin privileges required'}), 403
+
+        return fn(*args, **kwargs)
     return wrapper
 
 
 @api.route('/admin/users', methods=['GET'])
-@admin_required()
+@admin_required
 def get_all_users():
     """Get all users with detailed information (admin only)"""
     from models import PageTimeTracking
@@ -386,7 +386,7 @@ def get_all_users():
 
 
 @api.route('/admin/users/<int:user_id>', methods=['GET'])
-@admin_required()
+@admin_required
 def get_user_details(user_id):
     """Get detailed information about a specific user (admin only)"""
     from models import PageTimeTracking
@@ -413,7 +413,7 @@ def get_user_details(user_id):
 
 
 @api.route('/admin/users/<int:user_id>/reset-password', methods=['POST'])
-@admin_required()
+@admin_required
 def admin_reset_password(user_id):
     """Reset a user's password (admin only)"""
     from auth import hash_password
@@ -436,7 +436,7 @@ def admin_reset_password(user_id):
 
 
 @api.route('/admin/users/<int:user_id>', methods=['DELETE'])
-@admin_required()
+@admin_required
 def delete_user(user_id):
     """Delete a user (admin only)"""
     user = User.query.get(user_id)

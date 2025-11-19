@@ -47,7 +47,7 @@ const AdminDashboard: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
       const response = await axios.get(`${API_BASE_URL}/admin/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -61,7 +61,7 @@ const AdminDashboard: React.FC = () => {
 
   const fetchUserDetails = async (userId: number) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
       const response = await axios.get(`${API_BASE_URL}/admin/users/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -75,7 +75,7 @@ const AdminDashboard: React.FC = () => {
     if (!selectedUser || !newPassword) return;
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
       await axios.post(
         `${API_BASE_URL}/admin/users/${selectedUser.id}/reset-password`,
         { new_password: newPassword },
@@ -95,7 +95,7 @@ const AdminDashboard: React.FC = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
       await axios.delete(`${API_BASE_URL}/admin/users/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
