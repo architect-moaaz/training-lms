@@ -38,6 +38,29 @@
   font-size: 0.95rem;
 }
 
+.admin-button, .dashboard-button {
+  background: #f39c12;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.admin-button:hover, .dashboard-button:hover {
+  background: #e67e22;
+}
+
+.dashboard-button {
+  background: #3498db;
+}
+
+.dashboard-button:hover {
+  background: #2980b9;
+}
+
 .logout-button {
   background: #e74c3c;
   color: white;
@@ -45,6 +68,7 @@
   padding: 0.5rem 1rem;
   border-radius: 4px;
   font-size: 0.9rem;
+  cursor: pointer;
   transition: background 0.2s;
 }
 

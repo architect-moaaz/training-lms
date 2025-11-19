@@ -28,9 +28,20 @@ const Navbar: React.FC = () => {
           <span className="breadcrumb">Dashboard / Day {location.pathname.split('/day/')[1]}</span>
         )}
         {location.pathname === '/dashboard' && <span className="breadcrumb">Dashboard</span>}
+        {location.pathname === '/admin' && <span className="breadcrumb">Admin Dashboard</span>}
       </div>
 
       <div className="navbar-menu">
+        {user.is_admin && location.pathname !== '/admin' && (
+          <button onClick={() => navigate('/admin')} className="admin-button">
+            Admin Panel
+          </button>
+        )}
+        {user.is_admin && location.pathname === '/admin' && (
+          <button onClick={() => navigate('/dashboard')} className="dashboard-button">
+            Dashboard
+          </button>
+        )}
         <span className="user-name">{user.username}</span>
         <button onClick={handleLogout} className="logout-button">
           Logout
