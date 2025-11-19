@@ -122,22 +122,45 @@ The frontend needs to be deployed separately. Options:
 
 ## Database Configuration
 
-By default, the app uses SQLite. For production, consider using PostgreSQL:
+By default, the app uses SQLite. For production on Railway, use PostgreSQL:
 
-1. **Add PostgreSQL to Railway**
-   - In your Railway project, click "New"
-   - Select "Database" → "PostgreSQL"
-   - Railway will automatically add `DATABASE_URL` environment variable
+### Steps to Add PostgreSQL Database:
 
-2. **Update Backend Configuration**
-   - No code changes needed! The app already uses `DATABASE_URL`
-   - Railway automatically injects the PostgreSQL connection string
+1. **Add PostgreSQL to Railway Project**
+   - Go to your Railway project dashboard
+   - Click **"+ New"** button
+   - Select **"Database"**
+   - Choose **"PostgreSQL"**
+   - Railway will provision a PostgreSQL database
 
-3. **Install PostgreSQL Driver**
-   Add to `backend/requirements.txt`:
-   ```
-   psycopg2-binary==2.9.9
-   ```
+2. **Link Database to Backend Service**
+
+   **Option A: Using Reference Variable (Recommended)**
+   - Go to your **Backend Service** → **Variables** tab
+   - Click **"+ New Variable"**
+   - Click **"Reference"** tab
+   - Select your PostgreSQL database
+   - Choose **`DATABASE_URL`** from the dropdown
+   - Click **"Add"**
+
+   **Option B: Manual Configuration**
+   - Go to PostgreSQL service → **Variables** tab
+   - Copy the `DATABASE_URL` value
+   - Go to Backend Service → **Variables** tab
+   - Add new variable:
+     - Name: `DATABASE_URL`
+     - Value: (paste the copied URL)
+
+3. **Verify Configuration**
+   - The app is already configured to handle PostgreSQL!
+   - `psycopg2-binary` driver is included in requirements.txt
+   - Database URL conversion (postgres:// → postgresql://) is automatic
+   - Tables will be created automatically on first deployment
+
+4. **Redeploy Backend**
+   - After adding DATABASE_URL, Railway will automatically redeploy
+   - Check deployment logs to verify database connection
+   - Look for: "Database tables created successfully"
 
 ## Post-Deployment Steps
 
