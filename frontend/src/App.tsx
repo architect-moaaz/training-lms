@@ -8,14 +8,17 @@ import AdminDashboard from './components/AdminDashboard';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { isAuthenticated } from './utils/auth';
+import { usePageTracking } from './hooks/usePageTracking';
 import './App.css';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  // Track page visits and time spent
+  usePageTracking();
+
   return (
-    <Router>
-      <div className="app">
-        <Navbar />
-        <Routes>
+    <>
+      <Navbar />
+      <Routes>
           <Route
             path="/"
             element={
@@ -50,6 +53,15 @@ const App: React.FC = () => {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+    </>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <Router>
+      <div className="app">
+        <AppContent />
       </div>
     </Router>
   );
