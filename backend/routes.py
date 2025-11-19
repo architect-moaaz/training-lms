@@ -5,13 +5,12 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, User, UserProgress
 from auth import register_user, login_user
 from datetime import datetime
-from notebook_executor import NotebookExecutor
+from redis_kernel_manager import RedisKernelManager
 
 api = Blueprint('api', __name__)
 
-# Dictionary to store per-user notebook executors
-# Key: user_id, Value: NotebookExecutor instance
-user_kernels = {}
+# Redis-based kernel manager (works across multiple Gunicorn workers)
+kernel_manager = RedisKernelManager()
 
 
 @api.route('/auth/register', methods=['POST'])
@@ -267,15 +266,11 @@ def execute_cell():
     if not code:
         return jsonify({'error': 'No code provided'}), 400
 
-    # Get or create a notebook executor for this user
-    if user_id not in user_kernels:
-        print(f"Creating new kernel for user {user_id}")
-        user_kernels[user_id] = NotebookExecutor()
-    else:
-        print(f"Using existing kernel for user {user_id}")
+    # Get kernel for this user (Redis-managed)
+    kernel = kernel_manager.get_kernel(user_id)
 
     print(f"Executing code for user {user_id}: {code[:50]}...")
-    result = user_kernels[user_id].execute_cell(code)
+    result = kernel.execute_cell(code)
     print(f"Execution result: {result.get('success')}")
     return jsonify(result), 200
 
@@ -287,12 +282,7 @@ def restart_kernel():
     user_id = int(get_jwt_identity())
 
     try:
-        # Get or create a notebook executor for this user
-        if user_id not in user_kernels:
-            user_kernels[user_id] = NotebookExecutor()
-        else:
-            user_kernels[user_id].restart_kernel()
-
+        kernel_manager.restart_kernel(user_id)
         return jsonify({'success': True, 'message': 'Kernel restarted successfully'}), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
