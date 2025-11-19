@@ -32,7 +32,10 @@ class NotebookExecutor:
         # Use lock to prevent concurrent execution issues
         with self.lock:
             if not self.kernel_client or not self.kernel_client.is_alive():
+                print("Kernel is not alive, restarting...")
                 self._start_kernel()
+            else:
+                print("Kernel is alive and ready")
 
             try:
                 # Execute the code

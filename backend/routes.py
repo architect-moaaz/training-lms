@@ -269,9 +269,14 @@ def execute_cell():
 
     # Get or create a notebook executor for this user
     if user_id not in user_kernels:
+        print(f"Creating new kernel for user {user_id}")
         user_kernels[user_id] = NotebookExecutor()
+    else:
+        print(f"Using existing kernel for user {user_id}")
 
+    print(f"Executing code for user {user_id}: {code[:50]}...")
     result = user_kernels[user_id].execute_cell(code)
+    print(f"Execution result: {result.get('success')}")
     return jsonify(result), 200
 
 
