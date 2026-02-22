@@ -29,7 +29,11 @@ const DayContent: React.FC = () => {
       const data = await daysAPI.getDayContent(Number(dayNumber));
       setContent(data);
     } catch (err: any) {
-      setError('Failed to load content. Please try again.');
+      if (err.response?.status === 403) {
+        setError('Access denied. Your company does not have access to this content.');
+      } else {
+        setError('Failed to load content. Please try again.');
+      }
       console.error(err);
     } finally {
       setLoading(false);

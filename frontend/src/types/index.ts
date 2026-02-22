@@ -1,3 +1,30 @@
+export interface CompanyMembership {
+  id: number;
+  name: string;
+  joined_via: string;
+}
+
+export interface Company {
+  id: number;
+  name: string;
+  slug: string;
+  invite_code: string;
+  email_domains: string[];
+  is_active: boolean;
+  member_count: number;
+  accessible_days: number[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CompanyMember {
+  user_id: number;
+  username: string;
+  email: string;
+  joined_at: string;
+  joined_via: string;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -5,6 +32,7 @@ export interface User {
   is_admin: boolean;
   created_at: string;
   last_login: string | null;
+  companies?: CompanyMembership[];
 }
 
 export interface AuthResponse {

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Day, DayContent, UserProgress, Notebook, User } from '../types';
+import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, Company, CompanyMember } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -34,8 +34,13 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  register: async (username: string, email: string, password: string): Promise<AuthResponse> => {
-    const response = await api.post('/auth/register', { username, email, password });
+  register: async (username: string, email: string, password: string, inviteCode?: string): Promise<AuthResponse> => {
+    const response = await api.post('/auth/register', {
+      username,
+      email,
+      password,
+      invite_code: inviteCode || undefined,
+    });
     return response.data;
   },
 
@@ -91,6 +96,55 @@ export const progressAPI = {
   ): Promise<UserProgress> => {
     const response = await api.post(`/progress/${dayNumber}`, data);
     return response.data;
+  },
+};
+
+export const companiesAPI = {
+  getCompanies: async (): Promise<Company[]> => {
+    const response = await api.get('/admin/companies');
+    return response.data.companies;
+  },
+
+  createCompany: async (data: {
+    name: string;
+    invite_code: string;
+    email_domains?: string[];
+    accessible_days?: number[];
+  }): Promise<Company> => {
+    const response = await api.post('/admin/companies', data);
+    return response.data;
+  },
+
+  updateCompany: async (companyId: number, data: {
+    name?: string;
+    invite_code?: string;
+    email_domains?: string[];
+    is_active?: boolean;
+  }): Promise<Company> => {
+    const response = await api.put(`/admin/companies/${companyId}`, data);
+    return response.data;
+  },
+
+  deleteCompany: async (companyId: number): Promise<void> => {
+    await api.delete(`/admin/companies/${companyId}`);
+  },
+
+  setDayAccess: async (companyId: number, dayNumbers: number[]): Promise<Company> => {
+    const response = await api.put(`/admin/companies/${companyId}/access`, { day_numbers: dayNumbers });
+    return response.data;
+  },
+
+  getMembers: async (companyId: number): Promise<CompanyMember[]> => {
+    const response = await api.get(`/admin/companies/${companyId}/members`);
+    return response.data.members;
+  },
+
+  addMember: async (companyId: number, userId: number): Promise<void> => {
+    await api.post(`/admin/companies/${companyId}/members`, { user_id: userId });
+  },
+
+  removeMember: async (companyId: number, userId: number): Promise<void> => {
+    await api.delete(`/admin/companies/${companyId}/members/${userId}`);
   },
 };
 

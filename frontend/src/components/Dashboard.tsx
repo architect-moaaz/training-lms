@@ -89,8 +89,17 @@ const Dashboard: React.FC = () => {
       <div className="days-grid">
         {days.length === 0 ? (
           <div className="no-content">
-            <p>No learning content available yet.</p>
-            <p>Check back later!</p>
+            {user?.companies && user.companies.length === 0 && !user.is_admin ? (
+              <>
+                <p>You are not assigned to any company.</p>
+                <p>Contact your administrator or register with a valid invite code to access content.</p>
+              </>
+            ) : (
+              <>
+                <p>No learning content available yet.</p>
+                <p>Check back later!</p>
+              </>
+            )}
           </div>
         ) : (
           days.map((day) => {

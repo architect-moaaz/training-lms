@@ -1,7 +1,7 @@
 import bcrypt
 import requests
 from flask_jwt_extended import create_access_token, create_refresh_token
-from models import db, User
+from models import db, User, Company, UserCompany
 from datetime import datetime
 
 
@@ -35,7 +35,34 @@ def get_location_from_ip(ip_address):
     return {'country': 'Unknown', 'city': 'Unknown'}
 
 
-def register_user(username, email, password, ip_address=None):
+def _assign_company_by_invite_code(user, invite_code):
+    """Assign user to a company via invite code. Returns True if assigned."""
+    company = Company.query.filter_by(invite_code=invite_code, is_active=True).first()
+    if not company:
+        return False
+
+    existing = UserCompany.query.filter_by(user_id=user.id, company_id=company.id).first()
+    if not existing:
+        uc = UserCompany(user_id=user.id, company_id=company.id, joined_via='invite_code')
+        db.session.add(uc)
+    return True
+
+
+def _assign_companies_by_email_domain(user):
+    """Auto-assign user to companies matching their email domain."""
+    email_domain = user.email.split('@')[-1].lower()
+
+    active_companies = Company.query.filter_by(is_active=True).all()
+    for company in active_companies:
+        domains = company.get_email_domains_list()
+        if email_domain in domains:
+            existing = UserCompany.query.filter_by(user_id=user.id, company_id=company.id).first()
+            if not existing:
+                uc = UserCompany(user_id=user.id, company_id=company.id, joined_via='email_domain')
+                db.session.add(uc)
+
+
+def register_user(username, email, password, ip_address=None, invite_code=None):
     """Register a new user"""
     # Check if user already exists
     if User.query.filter_by(email=email).first():
@@ -69,6 +96,15 @@ def register_user(username, email, password, ip_address=None):
     )
 
     db.session.add(new_user)
+    db.session.flush()  # Get user.id before committing
+
+    # Assign to company via invite code
+    if invite_code:
+        _assign_company_by_invite_code(new_user, invite_code)
+
+    # Auto-assign by email domain
+    _assign_companies_by_email_domain(new_user)
+
     db.session.commit()
 
     # Generate tokens
@@ -78,7 +114,7 @@ def register_user(username, email, password, ip_address=None):
     return {
         'access_token': access_token,
         'refresh_token': refresh_token,
-        'user': new_user.to_dict()
+        'user': new_user.to_dict(include_companies=True)
     }, 201
 
 
@@ -107,5 +143,5 @@ def login_user(email_or_username, password):
     return {
         'access_token': access_token,
         'refresh_token': refresh_token,
-        'user': user.to_dict()
+        'user': user.to_dict(include_companies=True)
     }, 200

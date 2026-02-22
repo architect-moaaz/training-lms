@@ -11,6 +11,7 @@ const Register: React.FC = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    inviteCode: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -61,7 +62,8 @@ const Register: React.FC = () => {
       const response = await authAPI.register(
         formData.username,
         formData.email,
-        formData.password
+        formData.password,
+        formData.inviteCode || undefined
       );
 
       setAuthData(response.access_token, response.refresh_token, response.user);
@@ -136,6 +138,20 @@ const Register: React.FC = () => {
               disabled={loading}
               required
             />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="inviteCode">Invite Code</label>
+            <input
+              type="text"
+              id="inviteCode"
+              name="inviteCode"
+              value={formData.inviteCode}
+              onChange={handleChange}
+              placeholder="Enter invite code (optional)"
+              disabled={loading}
+            />
+            <span className="form-hint">If you have a company invite code, enter it here.</span>
           </div>
 
           <button type="submit" className="auth-button" disabled={loading}>
