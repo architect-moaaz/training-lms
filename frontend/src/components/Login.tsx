@@ -3,7 +3,8 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { authAPI } from '../utils/api';
 import { setAuthData } from '../utils/auth';
-import { GraduationCap } from 'lucide-react';
+
+
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -67,8 +68,8 @@ const Login: React.FC = () => {
       <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-violet-500/20 rounded-full blur-3xl" />
 
       <div className="glass-card p-8 w-full max-w-md animate-slide-up relative z-10">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <GraduationCap className="w-8 h-8 text-indigo-400" />
+        <div className="flex items-center justify-center mb-3">
+          <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-10" />
         </div>
         <h1 className="text-2xl font-bold text-center text-white mb-1">Welcome Back</h1>
         <p className="text-slate-400 text-center text-sm mb-6">Login to continue your learning journey</p>

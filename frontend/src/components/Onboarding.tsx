@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { authAPI } from '../utils/api';
 import { setAuthData, getAuthData } from '../utils/auth';
-import { GraduationCap, ArrowRight, ArrowLeft, User, Briefcase, Target } from 'lucide-react';
+import { ArrowRight, ArrowLeft, User, Briefcase, Target } from 'lucide-react';
 
 const EXPERIENCE_LEVELS = [
   { value: 'beginner', label: 'Beginner', desc: 'New to AI/ML' },
@@ -86,10 +86,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-violet-500/20 rounded-full blur-3xl" />
 
       <div className="glass-card p-8 w-full max-w-lg animate-slide-up relative z-10">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <GraduationCap className="w-8 h-8 text-indigo-400" />
+        <div className="flex items-center justify-center mb-3">
+          <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-10" />
         </div>
-        <h1 className="text-2xl font-bold text-center text-white mb-1">Welcome to LMS</h1>
+        <h1 className="text-2xl font-bold text-center text-white mb-1">Welcome to Spark10K</h1>
         <p className="text-slate-400 text-center text-sm mb-6">Let's get you set up — just a few quick questions.</p>
 
         {/* Progress bar */}

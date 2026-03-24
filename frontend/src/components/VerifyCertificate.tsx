@@ -39,9 +39,10 @@ const VerifyCertificate: React.FC = () => {
       <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl" />
 
       <div className="glass-card p-8 w-full max-w-md text-center relative z-10 animate-slide-up">
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <GraduationCap className="w-6 h-6 text-indigo-400" />
-          <span className="text-lg font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">LMS</span>
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-8" />
+          <div className="h-5 w-px bg-white/10" />
+          <span className="text-sm font-semibold text-slate-400">Certificate Verification</span>
         </div>
 
         {valid && data ? (
