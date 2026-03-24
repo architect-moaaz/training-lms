@@ -11,6 +11,7 @@ export interface Company {
   invite_code: string;
   email_domains: string[];
   is_active: boolean;
+  is_public: boolean;
   member_count: number;
   accessible_days: number[];
   created_at: string;
@@ -47,15 +48,26 @@ export interface Day {
   description: string;
   notebooks: number;
   pdfs: number;
+  videos: number;
   total_resources: number;
+  level?: string;
+}
+
+export interface VideoContent {
+  title: string;
+  url: string;
+  duration: string;
+  instructor?: string;
 }
 
 export interface DayContent {
   day_number: number;
   title: string;
   description: string;
+  level?: string;
   notebooks: ContentFile[];
   pdfs: ContentFile[];
+  videos: VideoContent[];
 }
 
 export interface ContentFile {

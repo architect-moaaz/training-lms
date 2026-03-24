@@ -1,0 +1,25 @@
+{
+  "title": "Intermediate: AI Agent Frameworks",
+  "description": "Dive deeper with framework-specific tutorials. Build advanced AI agents with voice, research, multi-agent systems, MCP, and RAG patterns.",
+  "level": "intermediate",
+  "videos": [
+    {
+      "title": "Build Advanced AI Agents (Voice, Research, Multi-Agent)",
+      "url": "https://www.youtube.com/results?search_query=How+to+Build+Advanced+AI+Agents+freeCodeCamp",
+      "duration": "3 hrs",
+      "instructor": "freeCodeCamp"
+    },
+    {
+      "title": "MCP Essentials with FastMCP",
+      "url": "https://youtu.be/DosHnyq78xY",
+      "duration": "1 hr",
+      "instructor": "Carlos Leon"
+    },
+    {
+      "title": "Build AI Agents with Langbase (Agentic RAG)",
+      "url": "https://youtu.be/BMt-qvrEcFY",
+      "duration": "1 hr",
+      "instructor": "Langbase"
+    }
+  ]
+}

@@ -112,6 +112,7 @@ class Company(db.Model):
     invite_code = db.Column(db.String(100), unique=True, nullable=False)
     email_domains = db.Column(db.Text, default='')  # comma-separated
     is_active = db.Column(db.Boolean, default=True)
+    is_public = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -136,6 +137,7 @@ class Company(db.Model):
             'invite_code': self.invite_code,
             'email_domains': self.get_email_domains_list(),
             'is_active': self.is_active,
+            'is_public': self.is_public,
             'member_count': len(self.members),
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
@@ -169,7 +171,8 @@ class CompanyDayAccess(db.Model):
 
 
 def get_accessible_days_for_user(user_id):
-    """Returns None for admin (all access), empty set for no-company users, or set of day_numbers."""
+    """Returns None for admin (all access), or set of day_numbers.
+    All authenticated users always get public days. Company users also get their company days."""
     user = User.query.get(user_id)
     if not user:
         return set()
@@ -177,24 +180,33 @@ def get_accessible_days_for_user(user_id):
     if user.is_admin:
         return None  # None means all access
 
-    # Get all active companies the user belongs to
+    # Start with public days (all logged-in users get these)
+    accessible = get_public_days()
+
+    # Add company-specific days
     user_companies = UserCompany.query.filter_by(user_id=user_id).all()
-    if not user_companies:
-        return set()
+    if user_companies:
+        company_ids = [uc.company_id for uc in user_companies]
+        active_companies = Company.query.filter(
+            Company.id.in_(company_ids),
+            Company.is_active == True
+        ).all()
 
-    company_ids = [uc.company_id for uc in user_companies]
-    # Only include active companies
-    active_companies = Company.query.filter(
-        Company.id.in_(company_ids),
-        Company.is_active == True
-    ).all()
+        if active_companies:
+            active_ids = [c.id for c in active_companies]
+            access_records = CompanyDayAccess.query.filter(
+                CompanyDayAccess.company_id.in_(active_ids)
+            ).all()
+            accessible.update(a.day_number for a in access_records)
 
-    if not active_companies:
-        return set()
+    return accessible
 
-    active_ids = [c.id for c in active_companies]
-    access_records = CompanyDayAccess.query.filter(
-        CompanyDayAccess.company_id.in_(active_ids)
-    ).all()
 
-    return {a.day_number for a in access_records}
+def get_public_days():
+    """Returns set of day_numbers that are publicly browsable."""
+    public_companies = Company.query.filter_by(is_public=True, is_active=True).all()
+    public_day_numbers = set()
+    for company in public_companies:
+        for da in company.day_access:
+            public_day_numbers.add(da.day_number)
+    return public_day_numbers

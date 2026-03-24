@@ -1,6 +1,10 @@
+import os
+import uuid
 import bcrypt
 import requests
 from flask_jwt_extended import create_access_token, create_refresh_token
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 from models import db, User, Company, UserCompany
 from datetime import datetime
 
@@ -116,6 +120,72 @@ def register_user(username, email, password, ip_address=None, invite_code=None):
         'refresh_token': refresh_token,
         'user': new_user.to_dict(include_companies=True)
     }, 201
+
+
+def google_login_user(google_token, ip_address=None):
+    """Authenticate or register a user via Google OAuth ID token"""
+    google_client_id = os.environ.get('GOOGLE_CLIENT_ID')
+    if not google_client_id:
+        return {'error': 'Google login is not configured'}, 500
+
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            google_token, google_requests.Request(), google_client_id
+        )
+    except ValueError as e:
+        return {'error': f'Invalid Google token: {str(e)}'}, 401
+
+    email = idinfo.get('email')
+    name = idinfo.get('name', '')
+    if not email:
+        return {'error': 'Google account has no email'}, 400
+
+    # Check if user already exists
+    user = User.query.filter_by(email=email).first()
+
+    if user:
+        # Existing user — log them in
+        user.last_login = datetime.utcnow()
+        db.session.commit()
+    else:
+        # New user — register
+        username = email.split('@')[0]
+        # Ensure username uniqueness
+        base_username = username
+        counter = 1
+        while User.query.filter_by(username=username).first():
+            username = f'{base_username}{counter}'
+            counter += 1
+
+        # Generate a random password hash (user will only use Google login)
+        random_password = hash_password(str(uuid.uuid4()))
+
+        location = get_location_from_ip(ip_address) if ip_address else {'country': 'Unknown', 'city': 'Unknown'}
+
+        user = User(
+            username=username,
+            email=email,
+            password_hash=random_password,
+            registration_ip=ip_address,
+            registration_country=location.get('country'),
+            registration_city=location.get('city')
+        )
+        db.session.add(user)
+        db.session.flush()
+
+        # Auto-assign companies by email domain
+        _assign_companies_by_email_domain(user)
+        db.session.commit()
+
+    # Generate tokens
+    access_token = create_access_token(identity=str(user.id))
+    refresh_token = create_refresh_token(identity=str(user.id))
+
+    return {
+        'access_token': access_token,
+        'refresh_token': refresh_token,
+        'user': user.to_dict(include_companies=True)
+    }, 200
 
 
 def login_user(email_or_username, password):

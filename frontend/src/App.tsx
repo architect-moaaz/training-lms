@@ -1,69 +1,62 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import DayContent from './components/DayContent';
 import AdminDashboard from './components/AdminDashboard';
+import PublicDashboard from './components/PublicDashboard';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { isAuthenticated } from './utils/auth';
 import { usePageTracking } from './hooks/usePageTracking';
-import './App.css';
+
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 
 const AppContent: React.FC = () => {
-  // Track page visits and time spent
   usePageTracking();
 
   return (
     <>
       <Navbar />
       <Routes>
-          <Route
-            path="/"
-            element={
-              isAuthenticated() ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
-            }
-          />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/day/:dayNumber"
-            element={
-              <ProtectedRoute>
-                <DayContent />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute>
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Route
+          path="/"
+          element={
+            isAuthenticated() ? <Navigate to="/dashboard" replace /> : <Navigate to="/browse" replace />
+          }
+        />
+        <Route path="/browse" element={<PublicDashboard />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route
+          path="/dashboard"
+          element={<ProtectedRoute><Dashboard /></ProtectedRoute>}
+        />
+        <Route
+          path="/day/:dayNumber"
+          element={<ProtectedRoute><DayContent /></ProtectedRoute>}
+        />
+        <Route
+          path="/admin"
+          element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>}
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </>
   );
 };
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <div className="app">
-        <AppContent />
-      </div>
-    </Router>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <Router>
+        <div className="min-h-screen flex flex-col">
+          <AppContent />
+        </div>
+      </Router>
+    </GoogleOAuthProvider>
   );
 };
 

@@ -2,8 +2,8 @@ import os
 import json
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, User, UserProgress, Company, UserCompany, CompanyDayAccess, get_accessible_days_for_user
-from auth import register_user, login_user
+from models import db, User, UserProgress, Company, UserCompany, CompanyDayAccess, get_accessible_days_for_user, get_public_days
+from auth import register_user, login_user, google_login_user
 from datetime import datetime
 from redis_kernel_manager import RedisKernelManager
 
@@ -46,56 +46,66 @@ def login():
     return jsonify(result), status_code
 
 
-@api.route('/days', methods=['GET'])
-@jwt_required()
-def get_days():
-    """Get all available days with content metadata"""
-    user_id = int(get_jwt_identity())
-    accessible_days = get_accessible_days_for_user(user_id)
+@api.route('/auth/google', methods=['POST'])
+def google_login():
+    """Login or register via Google OAuth"""
+    data = request.get_json()
+    google_token = data.get('credential')
+    if not google_token:
+        return jsonify({'error': 'Google credential required'}), 400
 
-    # Check if running in Railway (use local public folder) or locally (use parent public folder)
+    if request.headers.getlist("X-Forwarded-For"):
+        ip_address = request.headers.getlist("X-Forwarded-For")[0]
+    else:
+        ip_address = request.remote_addr
+
+    result, status_code = google_login_user(google_token, ip_address)
+    return jsonify(result), status_code
+
+
+def _get_public_folder():
+    """Get the public content folder path."""
     base_dir = os.path.dirname(os.path.abspath(__file__))
     public_folder = os.environ.get('PUBLIC_FOLDER', os.path.join(base_dir, 'public'))
-
-    # Fallback to parent directory public folder if local one doesn't exist
     if not os.path.exists(public_folder):
         public_folder = os.path.join(os.path.dirname(base_dir), 'public')
+    return public_folder
 
+
+def _scan_days(allowed_day_numbers=None):
+    """Scan filesystem for day folders. If allowed_day_numbers is None, return all days.
+    If it's a set, filter to only those days."""
+    public_folder = _get_public_folder()
     if not os.path.exists(public_folder):
-        return jsonify({'error': 'Content not available'}), 404
+        return []
 
     days = []
-
-    # Scan for day folders
     for item in sorted(os.listdir(public_folder)):
         item_path = os.path.join(public_folder, item)
-
         if os.path.isdir(item_path) and item.startswith('day'):
             try:
                 day_number = int(item.replace('day', ''))
             except ValueError:
                 continue
 
-            # Filter by accessible days (None means admin - all access)
-            if accessible_days is not None and day_number not in accessible_days:
+            if allowed_day_numbers is not None and day_number not in allowed_day_numbers:
                 continue
 
-            # Get content files
             notebooks = []
             pdfs = []
-
             for file in os.listdir(item_path):
                 if file.endswith('.ipynb'):
                     notebooks.append(file)
                 elif file.endswith('.pdf'):
                     pdfs.append(file)
 
-            # Load metadata if exists
             metadata_path = os.path.join(item_path, 'metadata.json')
             metadata = {}
             if os.path.exists(metadata_path):
                 with open(metadata_path, 'r') as f:
                     metadata = json.load(f)
+
+            videos = metadata.get('videos', [])
 
             days.append({
                 'day_number': day_number,
@@ -103,9 +113,30 @@ def get_days():
                 'description': metadata.get('description', ''),
                 'notebooks': len(notebooks),
                 'pdfs': len(pdfs),
-                'total_resources': len(notebooks) + len(pdfs)
+                'videos': len(videos),
+                'total_resources': len(notebooks) + len(pdfs) + len(videos),
+                'level': metadata.get('level', ''),
             })
+    return days
 
+
+@api.route('/public/days', methods=['GET'])
+def get_public_days_list():
+    """Get publicly browsable days (no auth required)"""
+    public_day_numbers = get_public_days()
+    if not public_day_numbers:
+        return jsonify({'days': []}), 200
+    days = _scan_days(allowed_day_numbers=public_day_numbers)
+    return jsonify({'days': days}), 200
+
+
+@api.route('/days', methods=['GET'])
+@jwt_required()
+def get_days():
+    """Get all available days with content metadata"""
+    user_id = int(get_jwt_identity())
+    accessible_days = get_accessible_days_for_user(user_id)
+    days = _scan_days(allowed_day_numbers=accessible_days)
     return jsonify({'days': days}), 200
 
 
@@ -117,6 +148,16 @@ def _check_day_access(user_id, day_number):
     return None
 
 
+def _auto_track_progress(user_id, day_number):
+    """Auto-create progress record when user accesses content."""
+    progress = UserProgress.query.filter_by(user_id=user_id, day_number=day_number).first()
+    if not progress:
+        progress = UserProgress(user_id=user_id, day_number=day_number)
+        db.session.add(progress)
+    progress.last_accessed = datetime.utcnow()
+    db.session.commit()
+
+
 @api.route('/days/<int:day_number>/content', methods=['GET'])
 @jwt_required()
 def get_day_content(day_number):
@@ -126,22 +167,19 @@ def get_day_content(day_number):
     if access_error:
         return access_error
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    public_folder = os.environ.get('PUBLIC_FOLDER', os.path.join(base_dir, 'public'))
-    if not os.path.exists(public_folder):
-        public_folder = os.path.join(os.path.dirname(base_dir), 'public')
-
+    public_folder = _get_public_folder()
     day_folder = os.path.join(public_folder, f'day{day_number}')
 
     if not os.path.exists(day_folder):
         return jsonify({'error': 'Day not found'}), 404
 
+    # Auto-track progress on content access
+    _auto_track_progress(user_id, day_number)
+
     notebooks = []
     pdfs = []
 
     for file in os.listdir(day_folder):
-        file_path = os.path.join(day_folder, file)
-
         if file.endswith('.ipynb'):
             notebooks.append({
                 'filename': file,
@@ -155,19 +193,22 @@ def get_day_content(day_number):
                 'type': 'pdf'
             })
 
-    # Load metadata if exists
     metadata_path = os.path.join(day_folder, 'metadata.json')
     metadata = {}
     if os.path.exists(metadata_path):
         with open(metadata_path, 'r') as f:
             metadata = json.load(f)
 
+    videos = metadata.get('videos', [])
+
     return jsonify({
         'day_number': day_number,
         'title': metadata.get('title', f'Day {day_number}'),
         'description': metadata.get('description', ''),
+        'level': metadata.get('level', ''),
         'notebooks': notebooks,
-        'pdfs': pdfs
+        'pdfs': pdfs,
+        'videos': videos
     }), 200
 
 
@@ -180,11 +221,7 @@ def get_notebook(day_number, filename):
     if access_error:
         return access_error
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    public_folder = os.environ.get('PUBLIC_FOLDER', os.path.join(base_dir, 'public'))
-    if not os.path.exists(public_folder):
-        public_folder = os.path.join(os.path.dirname(base_dir), 'public')
-
+    public_folder = _get_public_folder()
     notebook_path = os.path.join(public_folder, f'day{day_number}', filename)
 
     # Security: validate filename to prevent directory traversal
@@ -209,11 +246,7 @@ def get_pdf(day_number, filename):
     if access_error:
         return access_error
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    public_folder = os.environ.get('PUBLIC_FOLDER', os.path.join(base_dir, 'public'))
-    if not os.path.exists(public_folder):
-        public_folder = os.path.join(os.path.dirname(base_dir), 'public')
-
+    public_folder = _get_public_folder()
     pdf_path = os.path.join(public_folder, f'day{day_number}', filename)
 
     # Security: validate filename to prevent directory traversal
@@ -607,6 +640,9 @@ def update_company(company_id):
 
     if 'is_active' in data:
         company.is_active = bool(data['is_active'])
+
+    if 'is_public' in data:
+        company.is_public = bool(data['is_public'])
 
     db.session.commit()
 

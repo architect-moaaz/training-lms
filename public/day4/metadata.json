@@ -1,0 +1,25 @@
+{
+  "title": "Beginner: Agentic AI Fundamentals",
+  "description": "Start your journey into Agentic AI. Learn how to build agentic workflows, AI coding agents, and autonomous agents using Python.",
+  "level": "beginner",
+  "videos": [
+    {
+      "title": "How to Build Agentic AI Workflows",
+      "url": "https://youtu.be/tr5Fapv80Cw",
+      "duration": "2 hrs",
+      "instructor": "Rola Dali, PhD"
+    },
+    {
+      "title": "Build an AI Coding Agent in Python",
+      "url": "https://youtu.be/YtHdaXuOAks",
+      "duration": "2 hrs",
+      "instructor": "Lane Wagner"
+    },
+    {
+      "title": "Learn Python & Build Autonomous Agents",
+      "url": "https://youtu.be/UsfpzxZNsPo",
+      "duration": "6 hrs",
+      "instructor": "freeCodeCamp"
+    }
+  ]
+}

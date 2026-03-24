@@ -1,0 +1,13 @@
+{
+  "title": "No-Code: AI Agent Automation with n8n",
+  "description": "Learn to build production-grade AI agents without writing code using n8n workflow automation platform.",
+  "level": "no-code",
+  "videos": [
+    {
+      "title": "n8n for Production-Grade AI Agents",
+      "url": "https://youtu.be/UIf-SlmMays",
+      "duration": "4 hrs",
+      "instructor": "Marconi Darmawan"
+    }
+  ]
+}

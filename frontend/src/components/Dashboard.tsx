@@ -3,7 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { daysAPI, progressAPI } from '../utils/api';
 import { Day, UserProgress } from '../types';
 import { getAuthData } from '../utils/auth';
-import '../styles/Dashboard.css';
+import { BookOpen, FileText, Play, Check } from 'lucide-react';
+
+const LEVEL_STYLES: Record<string, string> = {
+  beginner: 'bg-emerald-500/10 text-emerald-400',
+  intermediate: 'bg-amber-500/10 text-amber-400',
+  'no-code': 'bg-sky-500/10 text-sky-400',
+};
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -13,92 +19,83 @@ const Dashboard: React.FC = () => {
   const [error, setError] = useState('');
   const { user } = getAuthData();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [daysData, progressData] = await Promise.all([
-        daysAPI.getDays(),
-        progressAPI.getProgress(),
-      ]);
-
+      const [daysData, progressData] = await Promise.all([daysAPI.getDays(), progressAPI.getProgress()]);
       setDays(daysData);
       setProgress(progressData);
     } catch (err: any) {
       setError('Failed to load content. Please try again.');
-      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const getDayProgress = (dayNumber: number) => {
-    return progress.find((p) => p.day_number === dayNumber);
-  };
-
+  const getDayProgress = (dayNumber: number) => progress.find((p) => p.day_number === dayNumber);
   const getCompletionPercentage = () => {
     if (days.length === 0) return 0;
-    const completedDays = progress.filter((p) => p.completed).length;
-    return Math.round((completedDays / days.length) * 100);
-  };
-
-  const handleDayClick = (dayNumber: number) => {
-    navigate(`/day/${dayNumber}`);
+    return Math.round((progress.filter((p) => p.completed).length / days.length) * 100);
   };
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">Loading your courses...</div>
+      <div className="flex-1 px-6 py-8 max-w-7xl mx-auto w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="glass-card p-6 animate-pulse">
+              <div className="h-4 bg-slate-700/50 rounded w-20 mb-4" />
+              <div className="h-6 bg-slate-700/50 rounded w-3/4 mb-3" />
+              <div className="h-4 bg-slate-700/50 rounded w-full mb-2" />
+              <div className="h-4 bg-slate-700/50 rounded w-2/3" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="dashboard-container">
-        <div className="error-message">{error}</div>
-        <button onClick={fetchData} className="retry-button">
-          Retry
-        </button>
+      <div className="flex-1 px-6 py-8 max-w-7xl mx-auto w-full text-center">
+        <div className="error-banner">{error}</div>
+        <button onClick={fetchData} className="btn-primary mt-4">Retry</button>
       </div>
     );
   }
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h1>Welcome, {user?.username}!</h1>
-        <div className="progress-summary">
-          <div className="progress-stat">
-            <span className="stat-label">Overall Progress</span>
-            <span className="stat-value">{getCompletionPercentage()}%</span>
+    <div className="flex-1 px-6 py-8 max-w-7xl mx-auto w-full">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-white mb-4">
+          Welcome, <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">{user?.username}</span>
+        </h1>
+        <div className="flex gap-4">
+          <div className="glass-card px-5 py-4">
+            <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Overall Progress</p>
+            <p className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
+              {getCompletionPercentage()}%
+            </p>
           </div>
-          <div className="progress-stat">
-            <span className="stat-label">Completed Days</span>
-            <span className="stat-value">
-              {progress.filter((p) => p.completed).length} / {days.length}
-            </span>
+          <div className="glass-card px-5 py-4">
+            <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Completed</p>
+            <p className="text-2xl font-bold text-white">
+              {progress.filter((p) => p.completed).length}
+              <span className="text-sm text-slate-500 font-normal"> / {days.length}</span>
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="days-grid">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {days.length === 0 ? (
-          <div className="no-content">
+          <div className="col-span-full text-center py-12 text-slate-400">
             {user?.companies && user.companies.length === 0 && !user.is_admin ? (
-              <>
-                <p>You are not assigned to any company.</p>
-                <p>Contact your administrator or register with a valid invite code to access content.</p>
-              </>
+              <><p>You are not assigned to any company.</p><p className="text-sm mt-1">Contact your administrator or register with a valid invite code to access content.</p></>
             ) : (
-              <>
-                <p>No learning content available yet.</p>
-                <p>Check back later!</p>
-              </>
+              <><p>No learning content available yet.</p><p className="text-sm mt-1">Check back later!</p></>
             )}
           </div>
         ) : (
@@ -109,37 +106,49 @@ const Dashboard: React.FC = () => {
             return (
               <div
                 key={day.day_number}
-                className={`day-card ${isCompleted ? 'completed' : ''}`}
-                onClick={() => handleDayClick(day.day_number)}
+                className={`glass-card-hover p-6 cursor-pointer group ${isCompleted ? 'border-emerald-500/30' : ''}`}
+                onClick={() => navigate(`/day/${day.day_number}`)}
               >
-                <div className="day-card-header">
-                  <h3>Day {day.day_number}</h3>
-                  {isCompleted && <span className="completion-badge">✓</span>}
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-indigo-400">Day {day.day_number}</span>
+                  <div className="flex items-center gap-2">
+                    {day.level && (
+                      <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${LEVEL_STYLES[day.level] || 'bg-slate-700 text-slate-300'}`}>
+                        {day.level}
+                      </span>
+                    )}
+                    {isCompleted && (
+                      <span className="bg-emerald-500/20 text-emerald-400 w-6 h-6 rounded-full flex items-center justify-center">
+                        <Check className="w-3.5 h-3.5" />
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <h4 className="day-title">{day.title}</h4>
+                <h4 className="text-lg font-semibold text-slate-100 group-hover:text-white mb-2 transition-colors">
+                  {day.title}
+                </h4>
 
                 {day.description && (
-                  <p className="day-description">{day.description}</p>
+                  <p className="text-sm text-slate-400 line-clamp-2 mb-4">{day.description}</p>
                 )}
 
-                <div className="day-resources">
-                  <div className="resource-count">
-                    <span className="resource-icon">📓</span>
-                    <span>{day.notebooks} Notebook{day.notebooks !== 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="resource-count">
-                    <span className="resource-icon">📄</span>
-                    <span>{day.pdfs} PDF{day.pdfs !== 1 ? 's' : ''}</span>
-                  </div>
+                <div className="flex items-center gap-4 pt-4 border-t border-white/5 text-sm text-slate-500">
+                  {day.videos > 0 && (
+                    <span className="flex items-center gap-1.5"><Play className="w-3.5 h-3.5" />{day.videos}</span>
+                  )}
+                  {day.notebooks > 0 && (
+                    <span className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" />{day.notebooks}</span>
+                  )}
+                  {day.pdfs > 0 && (
+                    <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" />{day.pdfs}</span>
+                  )}
                 </div>
 
                 {dayProgress && (
-                  <div className="day-footer">
-                    <span className="last-accessed">
-                      Last accessed: {new Date(dayProgress.last_accessed).toLocaleDateString()}
-                    </span>
-                  </div>
+                  <p className="text-xs text-slate-600 mt-3">
+                    Last accessed: {new Date(dayProgress.last_accessed).toLocaleDateString()}
+                  </p>
                 )}
               </div>
             );

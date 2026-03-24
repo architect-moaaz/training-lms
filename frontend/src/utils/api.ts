@@ -27,7 +27,11 @@ api.interceptors.response.use(
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Don't redirect if already on a public page
+      const publicPaths = ['/login', '/register', '/browse'];
+      if (!publicPaths.includes(window.location.pathname)) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -46,6 +50,11 @@ export const authAPI = {
 
   login: async (emailOrUsername: string, password: string): Promise<AuthResponse> => {
     const response = await api.post('/auth/login', { emailOrUsername, password });
+    return response.data;
+  },
+
+  googleLogin: async (credential: string): Promise<AuthResponse> => {
+    const response = await api.post('/auth/google', { credential });
     return response.data;
   },
 
@@ -120,6 +129,7 @@ export const companiesAPI = {
     invite_code?: string;
     email_domains?: string[];
     is_active?: boolean;
+    is_public?: boolean;
   }): Promise<Company> => {
     const response = await api.put(`/admin/companies/${companyId}`, data);
     return response.data;
@@ -145,6 +155,13 @@ export const companiesAPI = {
 
   removeMember: async (companyId: number, userId: number): Promise<void> => {
     await api.delete(`/admin/companies/${companyId}/members/${userId}`);
+  },
+};
+
+export const publicAPI = {
+  getDays: async (): Promise<Day[]> => {
+    const response = await api.get('/public/days');
+    return response.data.days;
   },
 };
 
