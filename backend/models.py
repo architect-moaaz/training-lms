@@ -24,13 +24,19 @@ class User(db.Model):
     progress = db.relationship('UserProgress', backref='user', lazy=True, cascade='all, delete-orphan')
     page_tracking = db.relationship('PageTimeTracking', backref='user', lazy=True, cascade='all, delete-orphan')
     companies = db.relationship('UserCompany', backref='user', lazy=True, cascade='all, delete-orphan')
+    profile = db.relationship('UserProfile', backref='user', uselist=False, lazy=True, cascade='all, delete-orphan')
 
-    def to_dict(self, include_sensitive=False, include_companies=False):
+    @property
+    def onboarding_completed(self):
+        return self.profile is not None
+
+    def to_dict(self, include_sensitive=False, include_companies=False, include_profile=False):
         data = {
             'id': self.id,
             'username': self.username,
             'email': self.email,
             'is_admin': self.is_admin,
+            'onboarding_completed': self.onboarding_completed,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None
         }
@@ -52,7 +58,47 @@ class User(db.Model):
                 for uc in self.companies if uc.company
             ]
 
+        if include_profile and self.profile:
+            data['profile'] = self.profile.to_dict()
+
         return data
+
+
+class UserProfile(db.Model):
+    __tablename__ = 'user_profiles'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    full_name = db.Column(db.String(200), nullable=False)
+    phone = db.Column(db.String(20), default='')
+    organization = db.Column(db.String(200), default='')
+    job_title = db.Column(db.String(200), default='')
+    country = db.Column(db.String(100), default='')
+    city = db.Column(db.String(100), default='')
+    experience_level = db.Column(db.String(50), default='')  # beginner, intermediate, advanced
+    # Survey fields
+    how_did_you_hear = db.Column(db.String(200), default='')
+    learning_goals = db.Column(db.Text, default='')
+    interests = db.Column(db.Text, default='')  # comma-separated
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'full_name': self.full_name,
+            'phone': self.phone,
+            'organization': self.organization,
+            'job_title': self.job_title,
+            'country': self.country,
+            'city': self.city,
+            'experience_level': self.experience_level,
+            'how_did_you_hear': self.how_did_you_hear,
+            'learning_goals': self.learning_goals,
+            'interests': self.interests,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
 
 
 class UserProgress(db.Model):

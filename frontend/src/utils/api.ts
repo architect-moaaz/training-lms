@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, Company, CompanyMember, FreeResource, CoursePackage } from '../types';
+import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -60,6 +60,18 @@ export const authAPI = {
 
   getCurrentUser: async (): Promise<User> => {
     const response = await api.get('/user/me');
+    return response.data;
+  },
+
+  submitOnboarding: async (data: Partial<UserProfileData>): Promise<{ success: boolean; user: User }> => {
+    const response = await api.post('/user/onboarding', data);
+    return response.data;
+  },
+};
+
+export const analyticsAPI = {
+  get: async (): Promise<any> => {
+    const response = await api.get('/admin/analytics');
     return response.data;
   },
 };

@@ -3,7 +3,7 @@ import re
 import json
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import (db, User, UserProgress, Company, UserCompany, CompanyDayAccess,
+from models import (db, User, UserProgress, UserProfile, Company, UserCompany, CompanyDayAccess,
                      FreeResource, CoursePackage, CoursePackageDay, CompanyPackageAccess,
                      get_accessible_days_for_user, get_public_days)
 from auth import register_user, login_user, google_login_user
@@ -319,7 +319,35 @@ def get_current_user():
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
-    return jsonify(user.to_dict(include_companies=True)), 200
+    return jsonify(user.to_dict(include_companies=True, include_profile=True)), 200
+
+
+@api.route('/user/onboarding', methods=['POST'])
+@jwt_required()
+def submit_onboarding():
+    """Submit onboarding profile"""
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    data = request.get_json()
+    if not data.get('full_name'):
+        return jsonify({'error': 'Full name is required'}), 400
+
+    # Create or update profile
+    profile = UserProfile.query.filter_by(user_id=user_id).first()
+    if not profile:
+        profile = UserProfile(user_id=user_id)
+        db.session.add(profile)
+
+    for field in ['full_name', 'phone', 'organization', 'job_title', 'country', 'city',
+                  'experience_level', 'how_did_you_hear', 'learning_goals', 'interests']:
+        if field in data:
+            setattr(profile, field, data[field])
+
+    db.session.commit()
+    return jsonify({'success': True, 'user': user.to_dict(include_companies=True, include_profile=True)}), 200
 
 
 @api.route('/execute/cell', methods=['POST'])
@@ -433,6 +461,81 @@ def admin_required(fn):
     return wrapper
 
 
+@api.route('/admin/analytics', methods=['GET'])
+@admin_required
+def get_analytics():
+    """Get platform analytics for admin dashboard"""
+    from models import PageTimeTracking
+    from collections import Counter
+
+    users = User.query.all()
+    profiles = UserProfile.query.all()
+    total_users = len(users)
+    onboarded_users = len(profiles)
+
+    # Demographics from profiles
+    countries = Counter(p.country for p in profiles if p.country)
+    experience_levels = Counter(p.experience_level for p in profiles if p.experience_level)
+    organizations = Counter(p.organization for p in profiles if p.organization)
+    how_heard = Counter(p.how_did_you_hear for p in profiles if p.how_did_you_hear)
+    interests_counter = Counter()
+    for p in profiles:
+        if p.interests:
+            for interest in p.interests.split(','):
+                interest = interest.strip()
+                if interest:
+                    interests_counter[interest] += 1
+
+    # Registration over time (last 30 days)
+    from datetime import timedelta
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    recent_users = [u for u in users if u.created_at and u.created_at >= thirty_days_ago]
+    registrations_by_date = Counter()
+    for u in recent_users:
+        registrations_by_date[u.created_at.strftime('%Y-%m-%d')] += 1
+
+    # Activity stats
+    all_progress = UserProgress.query.all()
+    all_tracking = PageTimeTracking.query.all()
+    total_time = sum(t.time_spent for t in all_tracking)
+    completed_days = sum(1 for p in all_progress if p.completed)
+
+    # Company distribution
+    company_members = Counter()
+    for uc in UserCompany.query.all():
+        company = Company.query.get(uc.company_id)
+        if company:
+            company_members[company.name] += 1
+    no_company_count = sum(1 for u in users if not u.companies)
+
+    # Google vs email login (heuristic: users with GOOGLE_OAUTH password pattern)
+    google_users = sum(1 for u in users if u.password_hash and u.password_hash.startswith('$2b$') and len(u.password_hash) > 50)
+
+    return jsonify({
+        'overview': {
+            'total_users': total_users,
+            'onboarded_users': onboarded_users,
+            'onboarding_rate': round(onboarded_users / total_users * 100, 1) if total_users else 0,
+            'total_time_spent': total_time,
+            'completed_days_total': completed_days,
+            'active_companies': Company.query.filter_by(is_active=True).count(),
+            'free_resources_count': FreeResource.query.filter_by(is_active=True).count(),
+        },
+        'demographics': {
+            'countries': dict(countries.most_common(20)),
+            'experience_levels': dict(experience_levels),
+            'organizations': dict(organizations.most_common(20)),
+            'how_did_you_hear': dict(how_heard.most_common(10)),
+            'interests': dict(interests_counter.most_common(15)),
+        },
+        'registrations_by_date': dict(sorted(registrations_by_date.items())),
+        'company_distribution': {
+            **dict(company_members.most_common(20)),
+            'No Company': no_company_count,
+        },
+    }), 200
+
+
 @api.route('/admin/users', methods=['GET'])
 @admin_required
 def get_all_users():
@@ -450,7 +553,7 @@ def get_all_users():
 
     users_data = []
     for user in users:
-        user_dict = user.to_dict(include_sensitive=True, include_companies=True)
+        user_dict = user.to_dict(include_sensitive=True, include_companies=True, include_profile=True)
 
         # Add page tracking stats
         page_tracks = PageTimeTracking.query.filter_by(user_id=user.id).all()

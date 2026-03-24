@@ -7,12 +7,23 @@ import Dashboard from './components/Dashboard';
 import DayContent from './components/DayContent';
 import AdminDashboard from './components/AdminDashboard';
 import PublicDashboard from './components/PublicDashboard';
+import Onboarding from './components/Onboarding';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
-import { isAuthenticated } from './utils/auth';
+import { isAuthenticated, getAuthData } from './utils/auth';
 import { usePageTracking } from './hooks/usePageTracking';
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
+
+const OnboardingGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = getAuthData();
+  const [completed, setCompleted] = React.useState(user?.onboarding_completed ?? false);
+
+  if (!completed && user && !user.is_admin) {
+    return <Onboarding onComplete={() => setCompleted(true)} />;
+  }
+  return <>{children}</>;
+};
 
 const AppContent: React.FC = () => {
   usePageTracking();
@@ -32,11 +43,11 @@ const AppContent: React.FC = () => {
         <Route path="/register" element={<Register />} />
         <Route
           path="/dashboard"
-          element={<ProtectedRoute><Dashboard /></ProtectedRoute>}
+          element={<ProtectedRoute><OnboardingGate><Dashboard /></OnboardingGate></ProtectedRoute>}
         />
         <Route
           path="/day/:dayNumber"
-          element={<ProtectedRoute><DayContent /></ProtectedRoute>}
+          element={<ProtectedRoute><OnboardingGate><DayContent /></OnboardingGate></ProtectedRoute>}
         />
         <Route
           path="/admin"

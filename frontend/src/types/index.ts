@@ -27,14 +27,29 @@ export interface CompanyMember {
   joined_via: string;
 }
 
+export interface UserProfileData {
+  full_name: string;
+  phone: string;
+  organization: string;
+  job_title: string;
+  country: string;
+  city: string;
+  experience_level: string;
+  how_did_you_hear: string;
+  learning_goals: string;
+  interests: string;
+}
+
 export interface User {
   id: number;
   username: string;
   email: string;
   is_admin: boolean;
+  onboarding_completed: boolean;
   created_at: string;
   last_login: string | null;
   companies?: CompanyMembership[];
+  profile?: UserProfileData;
 }
 
 export interface AuthResponse {
