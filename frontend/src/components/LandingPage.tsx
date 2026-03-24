@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { publicAPI, authAPI } from '../utils/api';
 import { setAuthData } from '../utils/auth';
-import { FreeResource } from '../types';
+import { FreeResource, EventData } from '../types';
 import {
   Play, BookOpen, Users, Zap, ChevronRight, ArrowRight, Star, Clock,
   Globe, Sparkles, CheckCircle, Rocket, Target, Award, Lightbulb, GraduationCap,
+  Calendar, MapPin, ExternalLink,
 } from 'lucide-react';
 
 const LEVEL_STYLES: Record<string, string> = {
@@ -20,10 +21,12 @@ const SPARK_BLUE = '#0077B5';
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [freeResources, setFreeResources] = useState<FreeResource[]>([]);
+  const [events, setEvents] = useState<EventData[]>([]);
   const [loginError, setLoginError] = useState('');
 
   useEffect(() => {
     publicAPI.getFreeResources().then(setFreeResources).catch(() => {});
+    publicAPI.getEvents().then(setEvents).catch(() => {});
   }, []);
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
@@ -317,6 +320,113 @@ const LandingPage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Events */}
+      {events.length > 0 && (
+        <section className="py-20 px-6 bg-white/[0.02]">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-14">
+              <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-4 border" style={{ background: `${SPARK_BLUE}10`, borderColor: `${SPARK_BLUE}20` }}>
+                <Calendar className="w-4 h-4" style={{ color: SPARK_BLUE }} />
+                <span className="text-sm" style={{ color: SPARK_BLUE }}>Workshops & Events</span>
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Events We've Conducted</h2>
+              <p className="text-slate-400 max-w-2xl mx-auto">
+                Spark10K brings hands-on AI training directly to colleges and communities across India.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {events.filter(e => !e.is_upcoming).map((event) => (
+                <div key={event.id} className="glass-card overflow-hidden group">
+                  {event.image_url && (
+                    <div className="h-48 overflow-hidden">
+                      <img src={event.image_url} alt={event.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    </div>
+                  )}
+                  <div className="p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-xs font-medium px-2.5 py-0.5 rounded-full capitalize"
+                        style={{ background: `${SPARK_BLUE}15`, color: SPARK_BLUE }}>
+                        {event.event_type}
+                      </span>
+                      {event.attendees && (
+                        <span className="flex items-center gap-1 text-xs text-slate-500">
+                          <Users className="w-3 h-3" /> {event.attendees} attendees
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">{event.title}</h3>
+                    <div className="flex items-center gap-4 text-sm text-slate-400 mb-3">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {new Date(event.event_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </span>
+                      {(event.city || event.location) && (
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5" />
+                          {event.city}{event.location && event.city ? ', ' : ''}{event.location}
+                        </span>
+                      )}
+                    </div>
+                    {event.description && (
+                      <p className="text-sm text-slate-400 leading-relaxed mb-3">{event.description}</p>
+                    )}
+                    {event.highlights && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {event.highlights.split(',').map((h, i) => (
+                          <span key={i} className="text-xs bg-white/5 text-slate-300 px-2 py-1 rounded-lg">
+                            {h.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {event.linkedin_url && (
+                      <a href={event.linkedin_url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-medium transition-colors hover:opacity-80" style={{ color: SPARK_BLUE }}>
+                        <ExternalLink className="w-3.5 h-3.5" /> View on LinkedIn
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Upcoming events */}
+            {events.some(e => e.is_upcoming) && (
+              <div className="mt-10">
+                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-400" /> Upcoming Events
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {events.filter(e => e.is_upcoming).map((event) => (
+                    <div key={event.id} className="glass-card p-5 border-amber-500/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 capitalize">
+                          {event.event_type} — Upcoming
+                        </span>
+                      </div>
+                      <h4 className="font-semibold text-white mb-2">{event.title}</h4>
+                      <div className="flex items-center gap-4 text-sm text-slate-400">
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {new Date(event.event_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </span>
+                        {event.city && (
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5" /> {event.city}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Who Should Join */}
       <section className="py-20 px-6 bg-white/[0.02]">

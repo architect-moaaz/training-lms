@@ -5,7 +5,7 @@ import json
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import (db, User, UserProgress, UserProfile, Company, UserCompany, CompanyDayAccess,
-                     FreeResource, UserFreeResourceEnrollment,
+                     Event, FreeResource, UserFreeResourceEnrollment,
                      CoursePackage, CoursePackageDay, CompanyPackageAccess,
                      CertificateTemplate, Certificate,
                      get_accessible_days_for_user, get_public_days)
@@ -864,6 +864,13 @@ def remove_company_member(company_id, user_id):
 
 # ========== FREE RESOURCES ==========
 
+@api.route('/public/events', methods=['GET'])
+def get_public_events():
+    """Get all active events (no auth required)"""
+    events = Event.query.filter_by(is_active=True).order_by(Event.event_date.desc()).all()
+    return jsonify({'events': [e.to_dict() for e in events]}), 200
+
+
 @api.route('/public/free-resources', methods=['GET'])
 def get_public_free_resources():
     """Get all active free resources (no auth required)"""
@@ -1292,3 +1299,76 @@ def get_all_certificates():
     """List all issued certificates"""
     certs = Certificate.query.order_by(Certificate.issued_at.desc()).all()
     return jsonify({'certificates': [c.to_dict() for c in certs]}), 200
+
+
+# ========== ADMIN EVENTS ==========
+
+@api.route('/admin/events', methods=['GET'])
+@admin_required
+def get_admin_events():
+    """List all events"""
+    events = Event.query.order_by(Event.event_date.desc()).all()
+    return jsonify({'events': [e.to_dict() for e in events]}), 200
+
+
+@api.route('/admin/events', methods=['POST'])
+@admin_required
+def create_event():
+    """Create an event"""
+    data = request.get_json()
+    if not data.get('title') or not data.get('event_date'):
+        return jsonify({'error': 'Title and date are required'}), 400
+
+    from datetime import date as date_type
+    event = Event(
+        title=data['title'],
+        description=data.get('description', ''),
+        event_date=date_type.fromisoformat(data['event_date']),
+        location=data.get('location', ''),
+        city=data.get('city', ''),
+        attendees=data.get('attendees', ''),
+        image_url=data.get('image_url'),
+        linkedin_url=data.get('linkedin_url'),
+        highlights=data.get('highlights', ''),
+        event_type=data.get('event_type', 'workshop'),
+        is_upcoming=data.get('is_upcoming', False),
+        is_active=data.get('is_active', True),
+        sort_order=data.get('sort_order', 0),
+    )
+    db.session.add(event)
+    db.session.commit()
+    return jsonify(event.to_dict()), 201
+
+
+@api.route('/admin/events/<int:event_id>', methods=['PUT'])
+@admin_required
+def update_event(event_id):
+    """Update an event"""
+    event = Event.query.get(event_id)
+    if not event:
+        return jsonify({'error': 'Event not found'}), 404
+
+    data = request.get_json()
+    from datetime import date as date_type
+    for field in ['title', 'description', 'location', 'city', 'attendees', 'image_url',
+                  'linkedin_url', 'highlights', 'event_type', 'is_upcoming', 'is_active', 'sort_order']:
+        if field in data:
+            setattr(event, field, data[field])
+    if 'event_date' in data:
+        event.event_date = date_type.fromisoformat(data['event_date'])
+
+    db.session.commit()
+    return jsonify(event.to_dict()), 200
+
+
+@api.route('/admin/events/<int:event_id>', methods=['DELETE'])
+@admin_required
+def delete_event(event_id):
+    """Delete an event"""
+    event = Event.query.get(event_id)
+    if not event:
+        return jsonify({'error': 'Event not found'}), 404
+
+    db.session.delete(event)
+    db.session.commit()
+    return jsonify({'success': True}), 200

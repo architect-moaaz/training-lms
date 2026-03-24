@@ -219,6 +219,44 @@ class CompanyDayAccess(db.Model):
     __table_args__ = (db.UniqueConstraint('company_id', 'day_number', name='_company_day_uc'),)
 
 
+class Event(db.Model):
+    __tablename__ = 'events'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+    event_date = db.Column(db.Date, nullable=False)
+    location = db.Column(db.String(300), default='')
+    city = db.Column(db.String(100), default='')
+    attendees = db.Column(db.String(50), default='')  # e.g. "200+", "25-50"
+    image_url = db.Column(db.String(500))
+    linkedin_url = db.Column(db.String(500))
+    highlights = db.Column(db.Text, default='')  # comma-separated or newline-separated
+    event_type = db.Column(db.String(50), default='workshop')  # workshop, bootcamp, hackathon, meetup
+    is_upcoming = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'event_date': self.event_date.isoformat() if self.event_date else None,
+            'location': self.location,
+            'city': self.city,
+            'attendees': self.attendees,
+            'image_url': self.image_url,
+            'linkedin_url': self.linkedin_url,
+            'highlights': self.highlights,
+            'event_type': self.event_type,
+            'is_upcoming': self.is_upcoming,
+            'is_active': self.is_active,
+            'sort_order': self.sort_order,
+        }
+
+
 class FreeResource(db.Model):
     __tablename__ = 'free_resources'
 

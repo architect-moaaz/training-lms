@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage, CertificateData, CertificateTemplate } from '../types';
+import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage, CertificateData, CertificateTemplate, EventData } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -199,6 +199,10 @@ export const publicAPI = {
     const response = await api.get('/public/free-resources');
     return response.data.resources;
   },
+  getEvents: async (): Promise<EventData[]> => {
+    const response = await api.get('/public/events');
+    return response.data.events;
+  },
 };
 
 export const freeResourcesAPI = {
@@ -272,6 +276,24 @@ export const certTemplatesAPI = {
   getAllCertificates: async (): Promise<CertificateData[]> => {
     const response = await api.get('/admin/certificates');
     return response.data.certificates;
+  },
+};
+
+export const eventsAPI = {
+  getAll: async (): Promise<EventData[]> => {
+    const response = await api.get('/admin/events');
+    return response.data.events;
+  },
+  create: async (data: Partial<EventData>): Promise<EventData> => {
+    const response = await api.post('/admin/events', data);
+    return response.data;
+  },
+  update: async (id: number, data: Partial<EventData>): Promise<EventData> => {
+    const response = await api.put(`/admin/events/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/admin/events/${id}`);
   },
 };
 

@@ -128,6 +128,23 @@ export interface CoursePackage {
   created_at: string;
 }
 
+export interface EventData {
+  id: number;
+  title: string;
+  description: string;
+  event_date: string;
+  location: string;
+  city: string;
+  attendees: string;
+  image_url: string | null;
+  linkedin_url: string | null;
+  highlights: string;
+  event_type: string;
+  is_upcoming: boolean;
+  is_active: boolean;
+  sort_order: number;
+}
+
 export interface CertificateTemplate {
   id: number;
   name: string;
