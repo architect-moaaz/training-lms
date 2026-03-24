@@ -1,7 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import LandingPage from './components/LandingPage';
+import Spark10KLanding from './components/Spark10KLanding';
+import LMSLanding from './components/LMSLanding';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
@@ -28,28 +29,43 @@ const OnboardingGate: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-// Pages that have their own navbar (landing page)
-const PAGES_WITHOUT_NAVBAR = ['/', '/landing'];
+// Pages that have their own navbar — hide the app-level Navbar on these
+const PAGES_WITHOUT_NAVBAR = ['/', '/lms'];
 const NAVBAR_HIDDEN_PREFIXES = ['/verify/'];
 
 const AppContent: React.FC = () => {
   usePageTracking();
   const location = useLocation();
-  const showNavbar = !PAGES_WITHOUT_NAVBAR.includes(location.pathname) && !NAVBAR_HIDDEN_PREFIXES.some(p => location.pathname.startsWith(p));
+  const showNavbar = !PAGES_WITHOUT_NAVBAR.includes(location.pathname)
+    && !NAVBAR_HIDDEN_PREFIXES.some(p => location.pathname.startsWith(p));
 
   return (
     <>
       {showNavbar && <Navbar />}
       <Routes>
+        {/* ── Public landing pages ── */}
         <Route
           path="/"
           element={
-            isAuthenticated() ? <Navigate to="/dashboard" replace /> : <LandingPage />
+            isAuthenticated() ? <Navigate to="/dashboard" replace /> : <Spark10KLanding />
           }
         />
-        <Route path="/browse" element={<PublicDashboard />} />
+        <Route
+          path="/lms"
+          element={
+            isAuthenticated() ? <Navigate to="/dashboard" replace /> : <LMSLanding />
+          }
+        />
+
+        {/* ── Auth ── */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+
+        {/* ── Public ── */}
+        <Route path="/browse" element={<PublicDashboard />} />
+        <Route path="/verify/:certId" element={<VerifyCertificate />} />
+
+        {/* ── Protected ── */}
         <Route
           path="/dashboard"
           element={<ProtectedRoute><OnboardingGate><Dashboard /></OnboardingGate></ProtectedRoute>}
@@ -62,11 +78,12 @@ const AppContent: React.FC = () => {
           path="/resource/:resourceId"
           element={<ProtectedRoute><OnboardingGate><FreeResourceViewer /></OnboardingGate></ProtectedRoute>}
         />
-        <Route path="/verify/:certId" element={<VerifyCertificate />} />
         <Route
           path="/admin"
           element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>}
         />
+
+        {/* ── Catch-all ── */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

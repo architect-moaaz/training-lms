@@ -144,8 +144,12 @@ const Login: React.FC = () => {
           </Link>
         </p>
         <p className="text-center text-sm text-slate-600 mt-2">
+          <Link to="/lms" className="hover:text-slate-400 transition-colors">
+            Back to LMS
+          </Link>
+          {' · '}
           <Link to="/" className="hover:text-slate-400 transition-colors">
-            Back to home
+            Spark10K Home
           </Link>
         </p>
       </div>
