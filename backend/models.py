@@ -253,6 +253,31 @@ class FreeResource(db.Model):
         }
 
 
+class UserFreeResourceEnrollment(db.Model):
+    __tablename__ = 'user_free_resource_enrollments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    resource_id = db.Column(db.Integer, db.ForeignKey('free_resources.id'), nullable=False)
+    enrolled_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed = db.Column(db.Boolean, default=False)
+    time_spent = db.Column(db.Integer, default=0)  # seconds
+    last_accessed = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'resource_id', name='_user_resource_uc'),)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'resource_id': self.resource_id,
+            'enrolled_at': self.enrolled_at.isoformat() if self.enrolled_at else None,
+            'completed': self.completed,
+            'time_spent': self.time_spent,
+            'last_accessed': self.last_accessed.isoformat() if self.last_accessed else None,
+        }
+
+
 class CoursePackage(db.Model):
     __tablename__ = 'course_packages'
 

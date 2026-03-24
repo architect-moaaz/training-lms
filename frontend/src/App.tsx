@@ -8,6 +8,7 @@ import DayContent from './components/DayContent';
 import AdminDashboard from './components/AdminDashboard';
 import PublicDashboard from './components/PublicDashboard';
 import Onboarding from './components/Onboarding';
+import FreeResourceViewer from './components/FreeResourceViewer';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { isAuthenticated, getAuthData } from './utils/auth';
@@ -48,6 +49,10 @@ const AppContent: React.FC = () => {
         <Route
           path="/day/:dayNumber"
           element={<ProtectedRoute><OnboardingGate><DayContent /></OnboardingGate></ProtectedRoute>}
+        />
+        <Route
+          path="/resource/:resourceId"
+          element={<ProtectedRoute><OnboardingGate><FreeResourceViewer /></OnboardingGate></ProtectedRoute>}
         />
         <Route
           path="/admin"

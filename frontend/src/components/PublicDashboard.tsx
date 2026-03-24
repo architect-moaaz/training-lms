@@ -19,6 +19,7 @@ const PublicDashboard: React.FC = () => {
   const [error, setError] = useState('');
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedResourceId, setSelectedResourceId] = useState<number | null>(null);
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [freeResources, setFreeResources] = useState<FreeResource[]>([]);
@@ -44,6 +45,14 @@ const PublicDashboard: React.FC = () => {
 
   const handleDayClick = (dayNumber: number) => {
     setSelectedDay(dayNumber);
+    setSelectedResourceId(null);
+    setShowLoginModal(true);
+    setLoginError('');
+  };
+
+  const handleResourceClick = (resourceId: number) => {
+    setSelectedResourceId(resourceId);
+    setSelectedDay(null);
     setShowLoginModal(true);
     setLoginError('');
   };
@@ -55,7 +64,13 @@ const PublicDashboard: React.FC = () => {
     try {
       const response = await authAPI.googleLogin(credentialResponse.credential);
       setAuthData(response.access_token, response.refresh_token, response.user);
-      navigate(selectedDay ? `/day/${selectedDay}` : '/dashboard');
+      if (selectedResourceId) {
+        navigate(`/resource/${selectedResourceId}`);
+      } else if (selectedDay) {
+        navigate(`/day/${selectedDay}`);
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       setLoginError(err.response?.data?.error || 'Google login failed.');
     } finally {
@@ -141,8 +156,8 @@ const PublicDashboard: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {freeResources.map((r) => (
-              <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer"
-                className="glass-card-hover p-5 group block">
+              <div key={r.id} onClick={() => handleResourceClick(r.id)}
+                className="glass-card-hover p-5 group cursor-pointer">
                 <div className="flex items-center justify-between mb-2">
                   <span className="flex items-center gap-1.5 text-xs text-violet-400">
                     <Play className="w-3 h-3" /> Free Course
@@ -155,10 +170,10 @@ const PublicDashboard: React.FC = () => {
                 </div>
                 <h4 className="font-semibold text-slate-100 group-hover:text-white mb-1 transition-colors">{r.title}</h4>
                 <p className="text-sm text-slate-500">{r.instructor && `${r.instructor} · `}{r.duration}</p>
-                <div className="flex items-center gap-1 mt-3 text-xs text-indigo-400 group-hover:text-indigo-300 transition-colors">
-                  <ExternalLink className="w-3 h-3" /> Watch on YouTube
+                <div className="flex items-center gap-1 mt-3 text-xs text-indigo-400">
+                  <Lock className="w-3 h-3" /> Sign in to start learning
                 </div>
-              </a>
+              </div>
             ))}
           </div>
         </div>

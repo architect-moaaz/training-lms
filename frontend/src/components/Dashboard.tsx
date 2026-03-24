@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { daysAPI, progressAPI, publicAPI } from '../utils/api';
+import { daysAPI, progressAPI, publicAPI, enrollmentAPI } from '../utils/api';
 import { Day, UserProgress, FreeResource } from '../types';
 import { getAuthData } from '../utils/auth';
-import { BookOpen, FileText, Play, Check, ExternalLink, Sparkles } from 'lucide-react';
+import { BookOpen, FileText, Play, Check, ChevronRight, Sparkles } from 'lucide-react';
 
 const LEVEL_STYLES: Record<string, string> = {
   beginner: 'bg-emerald-500/10 text-emerald-400',
@@ -16,6 +16,7 @@ const Dashboard: React.FC = () => {
   const [days, setDays] = useState<Day[]>([]);
   const [progress, setProgress] = useState<UserProgress[]>([]);
   const [freeResources, setFreeResources] = useState<FreeResource[]>([]);
+  const [enrollments, setEnrollments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { user } = getAuthData();
@@ -25,18 +26,23 @@ const Dashboard: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [daysData, progressData, resourcesData] = await Promise.all([
-        daysAPI.getDays(), progressAPI.getProgress(), publicAPI.getFreeResources()
+      const [daysData, progressData, resourcesData, enrollData] = await Promise.all([
+        daysAPI.getDays(), progressAPI.getProgress(), publicAPI.getFreeResources(),
+        enrollmentAPI.getMyEnrollments().catch(() => []),
       ]);
       setDays(daysData);
       setProgress(progressData);
       setFreeResources(resourcesData);
+      setEnrollments(enrollData);
     } catch (err: any) {
       setError('Failed to load content. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  const isEnrolled = (resourceId: number) => enrollments.some(e => e.resource_id === resourceId);
+  const isResourceCompleted = (resourceId: number) => enrollments.find(e => e.resource_id === resourceId)?.completed;
 
   const getDayProgress = (dayNumber: number) => progress.find((p) => p.day_number === dayNumber);
   const getCompletionPercentage = () => {
@@ -169,26 +175,38 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {freeResources.map((r) => (
-              <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer"
-                className="glass-card-hover p-5 group block">
+              <div key={r.id} onClick={() => navigate(`/resource/${r.id}`)}
+                className={`glass-card-hover p-5 group cursor-pointer ${isResourceCompleted(r.id) ? 'border-emerald-500/30' : ''}`}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="flex items-center gap-1.5 text-xs text-violet-400">
                     <Play className="w-3 h-3" /> Free Course
                   </span>
-                  {r.level && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${LEVEL_STYLES[r.level] || 'bg-slate-700 text-slate-300'}`}>
-                      {r.level}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {r.level && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${LEVEL_STYLES[r.level] || 'bg-slate-700 text-slate-300'}`}>
+                        {r.level}
+                      </span>
+                    )}
+                    {isResourceCompleted(r.id) && (
+                      <span className="bg-emerald-500/20 text-emerald-400 w-5 h-5 rounded-full flex items-center justify-center">
+                        <Check className="w-3 h-3" />
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <h4 className="font-semibold text-slate-100 group-hover:text-white mb-1 transition-colors">{r.title}</h4>
                 <p className="text-sm text-slate-500">
                   {r.instructor && `${r.instructor} · `}{r.duration}
                 </p>
-                <div className="flex items-center gap-1 mt-3 text-xs text-indigo-400 group-hover:text-indigo-300 transition-colors">
-                  <ExternalLink className="w-3 h-3" /> Watch on YouTube
+                <div className="flex items-center justify-between mt-3">
+                  {isEnrolled(r.id) ? (
+                    <span className="text-xs text-emerald-400">Enrolled</span>
+                  ) : (
+                    <span className="text-xs text-slate-500">Click to start</span>
+                  )}
+                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-indigo-400 transition-colors" />
                 </div>
-              </a>
+              </div>
             ))}
           </div>
         </div>

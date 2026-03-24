@@ -4,7 +4,8 @@ import json
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import (db, User, UserProgress, UserProfile, Company, UserCompany, CompanyDayAccess,
-                     FreeResource, CoursePackage, CoursePackageDay, CompanyPackageAccess,
+                     FreeResource, UserFreeResourceEnrollment,
+                     CoursePackage, CoursePackageDay, CompanyPackageAccess,
                      get_accessible_days_for_user, get_public_days)
 from auth import register_user, login_user, google_login_user
 from datetime import datetime
@@ -929,6 +930,56 @@ def delete_free_resource(resource_id):
     db.session.delete(resource)
     db.session.commit()
     return jsonify({'success': True}), 200
+
+
+# ========== FREE RESOURCE ENROLLMENT ==========
+
+@api.route('/free-resources/<int:resource_id>', methods=['GET'])
+@jwt_required()
+def get_free_resource(resource_id):
+    """Get a single free resource and auto-enroll the user"""
+    user_id = int(get_jwt_identity())
+    resource = FreeResource.query.get(resource_id)
+    if not resource or not resource.is_active:
+        return jsonify({'error': 'Resource not found'}), 404
+
+    # Auto-enroll
+    enrollment = UserFreeResourceEnrollment.query.filter_by(user_id=user_id, resource_id=resource_id).first()
+    if not enrollment:
+        enrollment = UserFreeResourceEnrollment(user_id=user_id, resource_id=resource_id)
+        db.session.add(enrollment)
+    enrollment.last_accessed = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({
+        'resource': resource.to_dict(),
+        'enrollment': enrollment.to_dict(),
+    }), 200
+
+
+@api.route('/free-resources/my-enrollments', methods=['GET'])
+@jwt_required()
+def get_my_enrollments():
+    """Get user's free resource enrollments"""
+    user_id = int(get_jwt_identity())
+    enrollments = UserFreeResourceEnrollment.query.filter_by(user_id=user_id).all()
+    return jsonify({
+        'enrollments': [e.to_dict() for e in enrollments],
+    }), 200
+
+
+@api.route('/free-resources/<int:resource_id>/complete', methods=['POST'])
+@jwt_required()
+def mark_resource_complete(resource_id):
+    """Mark a free resource as completed"""
+    user_id = int(get_jwt_identity())
+    enrollment = UserFreeResourceEnrollment.query.filter_by(user_id=user_id, resource_id=resource_id).first()
+    if not enrollment:
+        return jsonify({'error': 'Not enrolled'}), 404
+
+    enrollment.completed = not enrollment.completed
+    db.session.commit()
+    return jsonify(enrollment.to_dict()), 200
 
 
 # ========== COURSE PACKAGES ==========

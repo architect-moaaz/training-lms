@@ -175,6 +175,21 @@ export const companiesAPI = {
   },
 };
 
+export const enrollmentAPI = {
+  getResource: async (resourceId: number): Promise<{ resource: FreeResource; enrollment: any }> => {
+    const response = await api.get(`/free-resources/${resourceId}`);
+    return response.data;
+  },
+  getMyEnrollments: async (): Promise<any[]> => {
+    const response = await api.get('/free-resources/my-enrollments');
+    return response.data.enrollments;
+  },
+  markComplete: async (resourceId: number): Promise<any> => {
+    const response = await api.post(`/free-resources/${resourceId}/complete`);
+    return response.data;
+  },
+};
+
 export const publicAPI = {
   getDays: async (): Promise<Day[]> => {
     const response = await api.get('/public/days');
