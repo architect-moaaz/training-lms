@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CoursePackage } from '../../types';
 import { packagesAPI, daysAPI } from '../../utils/api';
-import { Plus, Pencil, Trash2, ArrowLeft, Package } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowLeft, BookOpen } from 'lucide-react';
 
 const PackageManagement: React.FC = () => {
   const [packages, setPackages] = useState<CoursePackage[]>([]);
@@ -13,7 +13,7 @@ const PackageManagement: React.FC = () => {
 
   useEffect(() => { fetchPackages(); fetchDays(); }, []);
 
-  const fetchPackages = async () => { try { setPackages(await packagesAPI.getAll()); } catch { setError('Failed to load packages'); } };
+  const fetchPackages = async () => { try { setPackages(await packagesAPI.getAll()); } catch { setError('Failed to load courses'); } };
   const fetchDays = async () => { try { setAvailableDays((await daysAPI.getDays()).map(d => d.day_number).sort((a, b) => a - b)); } catch {} };
 
   const openCreate = () => { setForm({ name: '', description: '', days: [], is_active: true }); setEditing(null); setShowForm(true); };
@@ -29,7 +29,7 @@ const PackageManagement: React.FC = () => {
   };
 
   const handleDelete = async (id: number, name: string) => {
-    if (!window.confirm(`Delete package "${name}"?`)) return;
+    if (!window.confirm(`Delete course "${name}"?`)) return;
     try { await packagesAPI.delete(id); fetchPackages(); } catch { setError('Failed to delete'); }
   };
 
@@ -44,11 +44,11 @@ const PackageManagement: React.FC = () => {
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
         <div className="glass-card p-6">
-          <h3 className="text-xl font-bold text-white mb-6">{editing ? 'Edit Package' : 'Create Package'}</h3>
+          <h3 className="text-xl font-bold text-white mb-6">{editing ? 'Edit Course' : 'Create Course'}</h3>
           {error && <div className="error-banner text-sm mb-4">{error}</div>}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Package Name *</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">Course Name *</label>
               <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className="input-field" placeholder="e.g. AI Foundations" />
             </div>
             <div>
@@ -56,7 +56,7 @@ const PackageManagement: React.FC = () => {
               <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="input-field min-h-[80px]" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Days in Package</label>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Days in Course</label>
               <div className="flex flex-wrap gap-2">
                 {availableDays.map(day => (
                   <button key={day} type="button" onClick={() => toggleDay(day)}
@@ -88,9 +88,9 @@ const PackageManagement: React.FC = () => {
     <div>
       {error && <div className="error-banner">{error}</div>}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-slate-200">Course Packages ({packages.length})</h2>
+        <h2 className="text-lg font-semibold text-slate-200">Courses ({packages.length})</h2>
         <button onClick={openCreate} className="btn-primary text-sm flex items-center gap-1.5">
-          <Plus className="w-4 h-4" /> New Package
+          <Plus className="w-4 h-4" /> New Course
         </button>
       </div>
 
@@ -99,7 +99,7 @@ const PackageManagement: React.FC = () => {
           <div key={p.id} className="glass-card p-5">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Package className="w-5 h-5 text-indigo-400" />
+                <BookOpen className="w-5 h-5 text-indigo-400" />
                 <h3 className="font-semibold text-white">{p.name}</h3>
               </div>
               <div className="flex gap-1.5">
@@ -121,7 +121,7 @@ const PackageManagement: React.FC = () => {
           </div>
         ))}
         {packages.length === 0 && (
-          <div className="col-span-full text-center text-slate-500 py-8">No packages yet. Create one to bundle days together.</div>
+          <div className="col-span-full text-center text-slate-500 py-8">No courses yet. Create one to bundle days together.</div>
         )}
       </div>
     </div>

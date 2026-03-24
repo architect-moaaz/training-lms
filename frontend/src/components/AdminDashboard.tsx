@@ -7,7 +7,7 @@ import FreeResourceManagement from './admin/FreeResourceManagement';
 import PackageManagement from './admin/PackageManagement';
 import Analytics from './admin/Analytics';
 import CertificateManagement from './admin/CertificateManagement';
-import { Users, Building, Shield, Clock, BookOpen, MapPin, Trash2, KeyRound, X, Plus, Library, Package, BarChart3, Award } from 'lucide-react';
+import { Users, Building, Shield, Clock, BookOpen, MapPin, Trash2, KeyRound, X, Plus, Library, GraduationCap, BarChart3, Award } from 'lucide-react';
 
 interface User {
   id: number; username: string; email: string; is_admin: boolean; created_at: string; last_login: string | null;
@@ -74,8 +74,8 @@ const AdminDashboard: React.FC = () => {
 
       <div className="flex gap-1 border-b border-white/10 mb-6 overflow-x-auto">
         {(['analytics', 'users', 'companies', 'content', 'packages', 'certificates'] as const).map((tab) => {
-          const icons = { analytics: BarChart3, users: Users, companies: Building, content: Library, packages: Package, certificates: Award };
-          const labels = { analytics: 'Analytics', users: 'Users', companies: 'Companies', content: 'Free Resources', packages: 'Packages', certificates: 'Certificates' };
+          const icons = { analytics: BarChart3, users: Users, companies: Building, content: Library, packages: GraduationCap, certificates: Award };
+          const labels = { analytics: 'Analytics', users: 'Users', companies: 'Companies', content: 'Free Resources', packages: 'Courses', certificates: 'Certificates' };
           const Icon = icons[tab];
           return (
             <button key={tab} onClick={() => setActiveTab(tab)}

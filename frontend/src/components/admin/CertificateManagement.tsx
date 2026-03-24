@@ -68,7 +68,7 @@ const CertificateManagement: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">Trigger Type *</label>
               <select value={form.trigger_type} onChange={e => setForm({ ...form, trigger_type: e.target.value, trigger_value: '' })} className="input-field">
-                <option value="package">Complete a Course Package</option>
+                <option value="package">Complete a Course</option>
                 <option value="category">Complete all resources in a category</option>
                 <option value="level">Complete all resources at a level</option>
               </select>
@@ -77,7 +77,7 @@ const CertificateManagement: React.FC = () => {
               <label className="block text-sm font-medium text-slate-300 mb-1.5">Trigger Value *</label>
               {form.trigger_type === 'package' ? (
                 <select value={form.trigger_value} onChange={e => setForm({ ...form, trigger_value: e.target.value })} className="input-field" required>
-                  <option value="">Select a package</option>
+                  <option value="">Select a course</option>
                   {packages.map(p => <option key={p.id} value={p.id}>{p.name} (Days: {p.days.join(', ')})</option>)}
                 </select>
               ) : form.trigger_type === 'level' ? (
@@ -92,7 +92,7 @@ const CertificateManagement: React.FC = () => {
                 <input value={form.trigger_value} onChange={e => setForm({ ...form, trigger_value: e.target.value })} className="input-field" placeholder="Category name (e.g. Agentic AI)" required />
               )}
               <p className="text-xs text-slate-500 mt-1">
-                {form.trigger_type === 'package' && 'Certificate issued when all days in the package are completed.'}
+                {form.trigger_type === 'package' && 'Certificate issued when all days in the course are completed.'}
                 {form.trigger_type === 'category' && 'Certificate issued when all free resources in this category are completed.'}
                 {form.trigger_type === 'level' && 'Certificate issued when all free resources at this level are completed.'}
               </p>
