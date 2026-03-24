@@ -15,7 +15,7 @@ const Navbar: React.FC = () => {
 
   const Brand = ({ onClick }: { onClick: () => void }) => (
     <div className="flex items-center gap-3 cursor-pointer" onClick={onClick}>
-      <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-7" />
+      <img src="/spark10k-logo.png" alt="Spark10K" className="h-7" />
       <div className="h-5 w-px bg-white/10" />
       <span className="text-sm font-semibold text-slate-400">Learning Platform</span>
     </div>

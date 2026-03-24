@@ -75,7 +75,7 @@ const LandingPage: React.FC = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-9" />
+            <img src="/spark10k-logo.png" alt="Spark10K" className="h-9" />
             <div className="h-6 w-px bg-white/10" />
             <span className="text-sm font-semibold text-slate-400">Learning Platform</span>
           </div>
@@ -190,7 +190,7 @@ const LandingPage: React.FC = () => {
                 </p>
               </div>
               <div className="mt-8 md:mt-0 md:w-64 shrink-0 flex flex-col items-center">
-                <img src="https://spark10k.com/logo.png" alt="Spark10K" className="w-32 mb-4 opacity-80" />
+                <img src="/spark10k-logo.png" alt="Spark10K" className="w-32 mb-4 opacity-80" />
                 <a href="https://www.spark10k.com" target="_blank" rel="noopener noreferrer"
                   className="text-sm font-medium flex items-center gap-1 transition-colors hover:opacity-80" style={{ color: SPARK_BLUE }}>
                   Learn more about Spark10K <ChevronRight className="w-4 h-4" />
@@ -486,7 +486,7 @@ const LandingPage: React.FC = () => {
       <footer className="py-10 px-6 border-t border-white/5">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-7 opacity-70" />
+            <img src="/spark10k-logo.png" alt="Spark10K" className="h-7 opacity-70" />
             <span className="text-sm text-slate-600">Empowering 10,000 students with Gen AI skills</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-slate-500">

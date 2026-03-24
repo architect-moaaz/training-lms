@@ -40,7 +40,7 @@ const VerifyCertificate: React.FC = () => {
 
       <div className="glass-card p-8 w-full max-w-md text-center relative z-10 animate-slide-up">
         <div className="flex items-center justify-center gap-3 mb-6">
-          <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-8" />
+          <img src="/spark10k-logo.png" alt="Spark10K" className="h-8" />
           <div className="h-5 w-px bg-white/10" />
           <span className="text-sm font-semibold text-slate-400">Certificate Verification</span>
         </div>

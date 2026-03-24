@@ -90,7 +90,7 @@ const LMSLanding: React.FC = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-            <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-8" />
+            <img src="/spark10k-logo.png" alt="Spark10K" className="h-8" />
             <div className="h-5 w-px bg-white/10" />
             <span className="text-sm font-semibold bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">
               Learning Platform
@@ -316,7 +316,7 @@ const LMSLanding: React.FC = () => {
       {/* ── Spark10K Badge ── */}
       <section className="py-20 px-6 bg-white/[0.02]">
         <div className="max-w-3xl mx-auto text-center">
-          <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-12 mx-auto mb-6 opacity-70" />
+          <img src="/spark10k-logo.png" alt="Spark10K" className="h-12 mx-auto mb-6 opacity-70" />
           <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
             Part of the Spark10K Initiative
           </h2>
@@ -375,7 +375,7 @@ const LMSLanding: React.FC = () => {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-              <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-7 opacity-70" />
+              <img src="/spark10k-logo.png" alt="Spark10K" className="h-7 opacity-70" />
               <div className="h-4 w-px bg-white/10" />
               <span className="text-sm text-slate-600">Learning Platform</span>
             </div>

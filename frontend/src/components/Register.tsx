@@ -67,7 +67,7 @@ const Register: React.FC = () => {
 
       <div className="glass-card p-8 w-full max-w-md animate-slide-up relative z-10">
         <div className="flex items-center justify-center mb-3">
-          <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-10" />
+          <img src="/spark10k-logo.png" alt="Spark10K" className="h-10" />
         </div>
         <h1 className="text-2xl font-bold text-center text-white mb-1">Create Account</h1>
         <p className="text-slate-400 text-center text-sm mb-6">Join our Learning Management System</p>

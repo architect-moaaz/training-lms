@@ -82,7 +82,7 @@ const Spark10KLanding: React.FC = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-9" />
+            <img src="/spark10k-logo.png" alt="Spark10K" className="h-9" />
           </div>
 
           {/* Desktop nav */}
@@ -223,7 +223,7 @@ const Spark10KLanding: React.FC = () => {
                 </p>
               </div>
               <div className="mt-10 md:mt-0 md:w-56 shrink-0 flex flex-col items-center">
-                <img src="https://spark10k.com/logo.png" alt="Spark10K" className="w-36 mb-5 opacity-80" />
+                <img src="/spark10k-logo.png" alt="Spark10K" className="w-36 mb-5 opacity-80" />
                 <a href="https://www.spark10k.com" target="_blank" rel="noopener noreferrer"
                   className="text-sm font-medium flex items-center gap-1 transition-colors hover:opacity-80" style={{ color: SPARK_BLUE }}>
                   spark10k.com <ExternalLink className="w-3.5 h-3.5" />
@@ -508,7 +508,7 @@ const Spark10KLanding: React.FC = () => {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <img src="https://spark10k.com/logo.png" alt="Spark10K" className="h-7 opacity-70" />
+              <img src="/spark10k-logo.png" alt="Spark10K" className="h-7 opacity-70" />
               <span className="text-sm text-slate-600">Empowering 10,000 students with Gen AI skills</span>
             </div>
             <div className="flex items-center gap-6 text-sm text-slate-500">
