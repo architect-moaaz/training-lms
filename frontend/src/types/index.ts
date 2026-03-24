@@ -128,6 +128,27 @@ export interface CoursePackage {
   created_at: string;
 }
 
+export interface CertificateTemplate {
+  id: number;
+  name: string;
+  description: string;
+  trigger_type: string;
+  trigger_value: string;
+  is_active: boolean;
+  issued_count: number;
+  created_at: string;
+}
+
+export interface CertificateData {
+  id: number;
+  cert_id: string;
+  user_id: number;
+  template_id: number;
+  user_name: string;
+  certificate_title: string;
+  issued_at: string;
+}
+
 export interface NotebookCell {
   cell_type: 'code' | 'markdown' | 'raw';
   source: string | string[];

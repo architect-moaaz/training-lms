@@ -1,11 +1,13 @@
 import os
 import re
+import io
 import json
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import (db, User, UserProgress, UserProfile, Company, UserCompany, CompanyDayAccess,
                      FreeResource, UserFreeResourceEnrollment,
                      CoursePackage, CoursePackageDay, CompanyPackageAccess,
+                     CertificateTemplate, Certificate,
                      get_accessible_days_for_user, get_public_days)
 from auth import register_user, login_user, google_login_user
 from datetime import datetime
@@ -1077,3 +1079,216 @@ def set_company_packages(company_id):
 
     db.session.commit()
     return jsonify(company.to_dict(include_access=True)), 200
+
+
+# ========== CERTIFICATES ==========
+
+def _check_and_issue_certificates(user_id):
+    """Check all active templates and issue certificates if criteria met. Returns newly issued certs."""
+    user = User.query.get(user_id)
+    if not user:
+        return []
+
+    profile = UserProfile.query.filter_by(user_id=user_id).first()
+    user_name = profile.full_name if profile else user.username
+
+    templates = CertificateTemplate.query.filter_by(is_active=True).all()
+    newly_issued = []
+
+    for template in templates:
+        # Skip if already issued
+        if Certificate.query.filter_by(user_id=user_id, template_id=template.id).first():
+            continue
+
+        earned = False
+
+        if template.trigger_type == 'package':
+            # Check if all days in the package are completed
+            try:
+                package_id = int(template.trigger_value)
+            except ValueError:
+                continue
+            package = CoursePackage.query.get(package_id)
+            if package:
+                required_days = {d.day_number for d in package.days}
+                if required_days:
+                    completed_days = {p.day_number for p in UserProgress.query.filter_by(user_id=user_id).all() if p.completed}
+                    if required_days.issubset(completed_days):
+                        earned = True
+
+        elif template.trigger_type == 'category':
+            # Check if all free resources in this category are completed
+            category = template.trigger_value
+            resources = FreeResource.query.filter_by(category=category, is_active=True).all()
+            if resources:
+                resource_ids = {r.id for r in resources}
+                completed_ids = {e.resource_id for e in UserFreeResourceEnrollment.query.filter_by(user_id=user_id).all() if e.completed}
+                if resource_ids.issubset(completed_ids):
+                    earned = True
+
+        elif template.trigger_type == 'level':
+            # Check if all free resources at this level are completed
+            level = template.trigger_value
+            resources = FreeResource.query.filter_by(level=level, is_active=True).all()
+            if resources:
+                resource_ids = {r.id for r in resources}
+                completed_ids = {e.resource_id for e in UserFreeResourceEnrollment.query.filter_by(user_id=user_id).all() if e.completed}
+                if resource_ids.issubset(completed_ids):
+                    earned = True
+
+        if earned:
+            cert = Certificate(
+                user_id=user_id,
+                template_id=template.id,
+                user_name=user_name,
+                certificate_title=template.name,
+            )
+            db.session.add(cert)
+            newly_issued.append(cert)
+
+    if newly_issued:
+        db.session.commit()
+
+    return newly_issued
+
+
+@api.route('/certificates/check', methods=['POST'])
+@jwt_required()
+def check_certificates():
+    """Check and issue any earned certificates for the current user"""
+    user_id = int(get_jwt_identity())
+    newly_issued = _check_and_issue_certificates(user_id)
+    return jsonify({
+        'newly_issued': [c.to_dict() for c in newly_issued],
+        'count': len(newly_issued),
+    }), 200
+
+
+@api.route('/certificates/my', methods=['GET'])
+@jwt_required()
+def get_my_certificates():
+    """Get all certificates for the current user"""
+    user_id = int(get_jwt_identity())
+    # Also check for new ones
+    _check_and_issue_certificates(user_id)
+    certs = Certificate.query.filter_by(user_id=user_id).order_by(Certificate.issued_at.desc()).all()
+    return jsonify({'certificates': [c.to_dict() for c in certs]}), 200
+
+
+@api.route('/certificates/<cert_id>/download', methods=['GET'])
+@jwt_required()
+def download_certificate(cert_id):
+    """Download certificate PDF"""
+    from certificate_pdf import generate_certificate_pdf
+
+    cert = Certificate.query.filter_by(cert_id=cert_id).first()
+    if not cert:
+        return jsonify({'error': 'Certificate not found'}), 404
+
+    # Only the certificate holder or admin can download
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if cert.user_id != user_id and not (user and user.is_admin):
+        return jsonify({'error': 'Access denied'}), 403
+
+    template = CertificateTemplate.query.get(cert.template_id)
+    description = template.description if template else ''
+
+    pdf_bytes = generate_certificate_pdf(
+        user_name=cert.user_name,
+        certificate_title=cert.certificate_title,
+        cert_id=cert.cert_id,
+        issued_date=cert.issued_at.strftime('%B %d, %Y') if cert.issued_at else '',
+        description=description,
+    )
+
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'{cert.cert_id}.pdf',
+    )
+
+
+@api.route('/verify/<cert_id>', methods=['GET'])
+def verify_certificate(cert_id):
+    """Public certificate verification (no auth required)"""
+    cert = Certificate.query.filter_by(cert_id=cert_id).first()
+    if not cert:
+        return jsonify({'error': 'Certificate not found', 'valid': False}), 404
+
+    return jsonify({
+        'valid': True,
+        'cert_id': cert.cert_id,
+        'user_name': cert.user_name,
+        'certificate_title': cert.certificate_title,
+        'issued_at': cert.issued_at.isoformat() if cert.issued_at else None,
+    }), 200
+
+
+# ========== ADMIN CERTIFICATE TEMPLATES ==========
+
+@api.route('/admin/certificate-templates', methods=['GET'])
+@admin_required
+def get_certificate_templates():
+    """List all certificate templates"""
+    templates = CertificateTemplate.query.all()
+    return jsonify({'templates': [t.to_dict() for t in templates]}), 200
+
+
+@api.route('/admin/certificate-templates', methods=['POST'])
+@admin_required
+def create_certificate_template():
+    """Create a certificate template"""
+    data = request.get_json()
+    if not data.get('name') or not data.get('trigger_type') or not data.get('trigger_value'):
+        return jsonify({'error': 'Name, trigger_type, and trigger_value are required'}), 400
+
+    template = CertificateTemplate(
+        name=data['name'],
+        description=data.get('description', ''),
+        trigger_type=data['trigger_type'],
+        trigger_value=str(data['trigger_value']),
+        is_active=data.get('is_active', True),
+    )
+    db.session.add(template)
+    db.session.commit()
+    return jsonify(template.to_dict()), 201
+
+
+@api.route('/admin/certificate-templates/<int:template_id>', methods=['PUT'])
+@admin_required
+def update_certificate_template(template_id):
+    """Update a certificate template"""
+    template = CertificateTemplate.query.get(template_id)
+    if not template:
+        return jsonify({'error': 'Template not found'}), 404
+
+    data = request.get_json()
+    for field in ['name', 'description', 'trigger_type', 'trigger_value', 'is_active']:
+        if field in data:
+            setattr(template, field, data[field] if field != 'trigger_value' else str(data[field]))
+
+    db.session.commit()
+    return jsonify(template.to_dict()), 200
+
+
+@api.route('/admin/certificate-templates/<int:template_id>', methods=['DELETE'])
+@admin_required
+def delete_certificate_template(template_id):
+    """Delete a certificate template"""
+    template = CertificateTemplate.query.get(template_id)
+    if not template:
+        return jsonify({'error': 'Template not found'}), 404
+
+    db.session.delete(template)
+    db.session.commit()
+    return jsonify({'success': True}), 200
+
+
+@api.route('/admin/certificates', methods=['GET'])
+@admin_required
+def get_all_certificates():
+    """List all issued certificates"""
+    certs = Certificate.query.order_by(Certificate.issued_at.desc()).all()
+    return jsonify({'certificates': [c.to_dict() for c in certs]}), 200

@@ -6,7 +6,8 @@ import CompanyManagement from './admin/CompanyManagement';
 import FreeResourceManagement from './admin/FreeResourceManagement';
 import PackageManagement from './admin/PackageManagement';
 import Analytics from './admin/Analytics';
-import { Users, Building, Shield, Clock, BookOpen, MapPin, Trash2, KeyRound, X, Plus, Library, Package, BarChart3 } from 'lucide-react';
+import CertificateManagement from './admin/CertificateManagement';
+import { Users, Building, Shield, Clock, BookOpen, MapPin, Trash2, KeyRound, X, Plus, Library, Package, BarChart3, Award } from 'lucide-react';
 
 interface User {
   id: number; username: string; email: string; is_admin: boolean; created_at: string; last_login: string | null;
@@ -19,7 +20,7 @@ interface PageTracking { page_url: string; page_title: string; time_spent: numbe
 interface UserDetails extends User { page_tracking: PageTracking[]; progress: any[]; }
 
 const AdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'analytics' | 'users' | 'companies' | 'content' | 'packages'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'users' | 'companies' | 'content' | 'packages' | 'certificates'>('analytics');
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,9 +73,9 @@ const AdminDashboard: React.FC = () => {
       <h1 className="text-2xl font-bold text-white mb-6">Admin Dashboard</h1>
 
       <div className="flex gap-1 border-b border-white/10 mb-6 overflow-x-auto">
-        {(['analytics', 'users', 'companies', 'content', 'packages'] as const).map((tab) => {
-          const icons = { analytics: BarChart3, users: Users, companies: Building, content: Library, packages: Package };
-          const labels = { analytics: 'Analytics', users: 'Users', companies: 'Companies', content: 'Free Resources', packages: 'Packages' };
+        {(['analytics', 'users', 'companies', 'content', 'packages', 'certificates'] as const).map((tab) => {
+          const icons = { analytics: BarChart3, users: Users, companies: Building, content: Library, packages: Package, certificates: Award };
+          const labels = { analytics: 'Analytics', users: 'Users', companies: 'Companies', content: 'Free Resources', packages: 'Packages', certificates: 'Certificates' };
           const Icon = icons[tab];
           return (
             <button key={tab} onClick={() => setActiveTab(tab)}
@@ -97,6 +98,8 @@ const AdminDashboard: React.FC = () => {
         <FreeResourceManagement />
       ) : activeTab === 'packages' ? (
         <PackageManagement />
+      ) : activeTab === 'certificates' ? (
+        <CertificateManagement />
       ) : (
         <>
           <div className="glass-card p-3 mb-6 flex items-center gap-3">

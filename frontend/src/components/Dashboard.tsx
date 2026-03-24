@@ -4,6 +4,7 @@ import { daysAPI, progressAPI, publicAPI, enrollmentAPI } from '../utils/api';
 import { Day, UserProgress, FreeResource } from '../types';
 import { getAuthData } from '../utils/auth';
 import { BookOpen, FileText, Play, Check, ChevronRight, Sparkles, Plus, Clock, User } from 'lucide-react';
+import MyCertificates from './MyCertificates';
 
 const LEVEL_STYLES: Record<string, string> = {
   beginner: 'bg-emerald-500/10 text-emerald-400',
@@ -113,6 +114,9 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ========== CERTIFICATES ========== */}
+      <MyCertificates />
 
       {/* ========== MY LEARNING ========== */}
       {(days.length > 0 || enrolledResources.length > 0) && (

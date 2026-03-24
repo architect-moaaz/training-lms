@@ -10,6 +10,7 @@ import AdminDashboard from './components/AdminDashboard';
 import PublicDashboard from './components/PublicDashboard';
 import Onboarding from './components/Onboarding';
 import FreeResourceViewer from './components/FreeResourceViewer';
+import VerifyCertificate from './components/VerifyCertificate';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { isAuthenticated, getAuthData } from './utils/auth';
@@ -29,11 +30,12 @@ const OnboardingGate: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 // Pages that have their own navbar (landing page)
 const PAGES_WITHOUT_NAVBAR = ['/', '/landing'];
+const NAVBAR_HIDDEN_PREFIXES = ['/verify/'];
 
 const AppContent: React.FC = () => {
   usePageTracking();
   const location = useLocation();
-  const showNavbar = !PAGES_WITHOUT_NAVBAR.includes(location.pathname);
+  const showNavbar = !PAGES_WITHOUT_NAVBAR.includes(location.pathname) && !NAVBAR_HIDDEN_PREFIXES.some(p => location.pathname.startsWith(p));
 
   return (
     <>
@@ -60,6 +62,7 @@ const AppContent: React.FC = () => {
           path="/resource/:resourceId"
           element={<ProtectedRoute><OnboardingGate><FreeResourceViewer /></OnboardingGate></ProtectedRoute>}
         />
+        <Route path="/verify/:certId" element={<VerifyCertificate />} />
         <Route
           path="/admin"
           element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>}

@@ -1,4 +1,5 @@
 import re
+import uuid
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
@@ -324,6 +325,61 @@ class CompanyPackageAccess(db.Model):
     granted_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (db.UniqueConstraint('company_id', 'package_id', name='_company_package_uc'),)
+
+
+class CertificateTemplate(db.Model):
+    __tablename__ = 'certificate_templates'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+    # Trigger: 'package' or 'category'
+    trigger_type = db.Column(db.String(50), nullable=False)  # 'package', 'category'
+    # For package: package_id. For category: category name (level like 'beginner')
+    trigger_value = db.Column(db.String(200), nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    certificates = db.relationship('Certificate', backref='template', lazy=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'trigger_type': self.trigger_type,
+            'trigger_value': self.trigger_value,
+            'is_active': self.is_active,
+            'issued_count': len(self.certificates),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class Certificate(db.Model):
+    __tablename__ = 'certificates'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cert_id = db.Column(db.String(50), unique=True, nullable=False, default=lambda: f"CERT-{uuid.uuid4().hex[:8].upper()}")
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    template_id = db.Column(db.Integer, db.ForeignKey('certificate_templates.id'), nullable=False)
+    user_name = db.Column(db.String(200), nullable=False)
+    certificate_title = db.Column(db.String(200), nullable=False)
+    issued_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('certificates', lazy=True))
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'template_id', name='_user_template_uc'),)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'cert_id': self.cert_id,
+            'user_id': self.user_id,
+            'template_id': self.template_id,
+            'user_name': self.user_name,
+            'certificate_title': self.certificate_title,
+            'issued_at': self.issued_at.isoformat() if self.issued_at else None,
+        }
 
 
 def get_accessible_days_for_user(user_id):

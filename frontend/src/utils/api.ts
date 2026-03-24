@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage } from '../types';
+import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage, CertificateData, CertificateTemplate } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -234,6 +234,44 @@ export const packagesAPI = {
   },
   delete: async (id: number): Promise<void> => {
     await api.delete(`/admin/packages/${id}`);
+  },
+};
+
+export const certificatesAPI = {
+  getMy: async (): Promise<CertificateData[]> => {
+    const response = await api.get('/certificates/my');
+    return response.data.certificates;
+  },
+  check: async (): Promise<{ newly_issued: CertificateData[]; count: number }> => {
+    const response = await api.post('/certificates/check');
+    return response.data;
+  },
+  getDownloadUrl: (certId: string): string => `${API_URL}/certificates/${certId}/download`,
+  verify: async (certId: string): Promise<any> => {
+    const response = await api.get(`/verify/${certId}`);
+    return response.data;
+  },
+};
+
+export const certTemplatesAPI = {
+  getAll: async (): Promise<CertificateTemplate[]> => {
+    const response = await api.get('/admin/certificate-templates');
+    return response.data.templates;
+  },
+  create: async (data: Partial<CertificateTemplate>): Promise<CertificateTemplate> => {
+    const response = await api.post('/admin/certificate-templates', data);
+    return response.data;
+  },
+  update: async (id: number, data: Partial<CertificateTemplate>): Promise<CertificateTemplate> => {
+    const response = await api.put(`/admin/certificate-templates/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/admin/certificate-templates/${id}`);
+  },
+  getAllCertificates: async (): Promise<CertificateData[]> => {
+    const response = await api.get('/admin/certificates');
+    return response.data.certificates;
   },
 };
 
