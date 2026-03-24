@@ -14,6 +14,7 @@ export interface Company {
   is_public: boolean;
   member_count: number;
   accessible_days: number[];
+  packages?: number[];
   created_at: string;
   updated_at: string;
 }
@@ -83,6 +84,33 @@ export interface UserProgress {
   completed: boolean;
   last_accessed: string;
   time_spent: number;
+}
+
+export interface FreeResource {
+  id: number;
+  title: string;
+  description: string;
+  url: string;
+  duration: string;
+  instructor: string;
+  level: string;
+  category: string;
+  thumbnail_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CoursePackage {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  is_active: boolean;
+  days: number[];
+  company_count: number;
+  created_at: string;
 }
 
 export interface NotebookCell {

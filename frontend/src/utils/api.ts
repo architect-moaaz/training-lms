@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, Company, CompanyMember } from '../types';
+import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, Company, CompanyMember, FreeResource, CoursePackage } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -156,12 +156,57 @@ export const companiesAPI = {
   removeMember: async (companyId: number, userId: number): Promise<void> => {
     await api.delete(`/admin/companies/${companyId}/members/${userId}`);
   },
+
+  setPackages: async (companyId: number, packageIds: number[]): Promise<Company> => {
+    const response = await api.put(`/admin/companies/${companyId}/packages`, { package_ids: packageIds });
+    return response.data;
+  },
 };
 
 export const publicAPI = {
   getDays: async (): Promise<Day[]> => {
     const response = await api.get('/public/days');
     return response.data.days;
+  },
+  getFreeResources: async (): Promise<FreeResource[]> => {
+    const response = await api.get('/public/free-resources');
+    return response.data.resources;
+  },
+};
+
+export const freeResourcesAPI = {
+  getAll: async (): Promise<FreeResource[]> => {
+    const response = await api.get('/admin/free-resources');
+    return response.data.resources;
+  },
+  create: async (data: Partial<FreeResource>): Promise<FreeResource> => {
+    const response = await api.post('/admin/free-resources', data);
+    return response.data;
+  },
+  update: async (id: number, data: Partial<FreeResource>): Promise<FreeResource> => {
+    const response = await api.put(`/admin/free-resources/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/admin/free-resources/${id}`);
+  },
+};
+
+export const packagesAPI = {
+  getAll: async (): Promise<CoursePackage[]> => {
+    const response = await api.get('/admin/packages');
+    return response.data.packages;
+  },
+  create: async (data: { name: string; description?: string; days?: number[] }): Promise<CoursePackage> => {
+    const response = await api.post('/admin/packages', data);
+    return response.data;
+  },
+  update: async (id: number, data: Partial<CoursePackage & { days: number[] }>): Promise<CoursePackage> => {
+    const response = await api.put(`/admin/packages/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/admin/packages/${id}`);
   },
 };
 

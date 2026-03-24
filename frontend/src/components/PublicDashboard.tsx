@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { publicAPI, authAPI } from '../utils/api';
 import { setAuthData } from '../utils/auth';
-import { Day } from '../types';
-import { Play, BookOpen, FileText, X, Lock } from 'lucide-react';
+import { Day, FreeResource } from '../types';
+import { Play, BookOpen, FileText, X, Lock, ExternalLink, Sparkles } from 'lucide-react';
 
 const LEVEL_STYLES: Record<string, string> = {
   beginner: 'bg-emerald-500/10 text-emerald-400',
@@ -21,19 +21,26 @@ const PublicDashboard: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [freeResources, setFreeResources] = useState<FreeResource[]>([]);
 
-  useEffect(() => { fetchDays(); }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  const fetchDays = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      setDays(await publicAPI.getDays());
+      const [daysData, resourcesData] = await Promise.all([
+        publicAPI.getDays(), publicAPI.getFreeResources()
+      ]);
+      setDays(daysData);
+      setFreeResources(resourcesData);
     } catch {
       setError('Failed to load courses. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  const fetchDays = fetchData;
 
   const handleDayClick = (dayNumber: number) => {
     setSelectedDay(dayNumber);
@@ -124,6 +131,38 @@ const PublicDashboard: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Free Resources - No login required */}
+      {freeResources.length > 0 && (
+        <div className="mt-12">
+          <div className="flex items-center gap-2 mb-6">
+            <Sparkles className="w-5 h-5 text-violet-400" />
+            <h2 className="text-xl font-bold text-white">Courses you might want to explore</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {freeResources.map((r) => (
+              <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer"
+                className="glass-card-hover p-5 group block">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="flex items-center gap-1.5 text-xs text-violet-400">
+                    <Play className="w-3 h-3" /> Free Course
+                  </span>
+                  {r.level && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${LEVEL_STYLES[r.level] || 'bg-slate-700 text-slate-300'}`}>
+                      {r.level}
+                    </span>
+                  )}
+                </div>
+                <h4 className="font-semibold text-slate-100 group-hover:text-white mb-1 transition-colors">{r.title}</h4>
+                <p className="text-sm text-slate-500">{r.instructor && `${r.instructor} · `}{r.duration}</p>
+                <div className="flex items-center gap-1 mt-3 text-xs text-indigo-400 group-hover:text-indigo-300 transition-colors">
+                  <ExternalLink className="w-3 h-3" /> Watch on YouTube
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Login Modal */}
       {showLoginModal && (

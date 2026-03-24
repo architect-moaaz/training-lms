@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { daysAPI, progressAPI } from '../utils/api';
-import { Day, UserProgress } from '../types';
+import { daysAPI, progressAPI, publicAPI } from '../utils/api';
+import { Day, UserProgress, FreeResource } from '../types';
 import { getAuthData } from '../utils/auth';
-import { BookOpen, FileText, Play, Check } from 'lucide-react';
+import { BookOpen, FileText, Play, Check, ExternalLink, Sparkles } from 'lucide-react';
 
 const LEVEL_STYLES: Record<string, string> = {
   beginner: 'bg-emerald-500/10 text-emerald-400',
@@ -15,6 +15,7 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [days, setDays] = useState<Day[]>([]);
   const [progress, setProgress] = useState<UserProgress[]>([]);
+  const [freeResources, setFreeResources] = useState<FreeResource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { user } = getAuthData();
@@ -24,9 +25,12 @@ const Dashboard: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [daysData, progressData] = await Promise.all([daysAPI.getDays(), progressAPI.getProgress()]);
+      const [daysData, progressData, resourcesData] = await Promise.all([
+        daysAPI.getDays(), progressAPI.getProgress(), publicAPI.getFreeResources()
+      ]);
       setDays(daysData);
       setProgress(progressData);
+      setFreeResources(resourcesData);
     } catch (err: any) {
       setError('Failed to load content. Please try again.');
     } finally {
@@ -155,6 +159,40 @@ const Dashboard: React.FC = () => {
           })
         )}
       </div>
+
+      {/* Free Resources Section */}
+      {freeResources.length > 0 && (
+        <div className="mt-12">
+          <div className="flex items-center gap-2 mb-6">
+            <Sparkles className="w-5 h-5 text-violet-400" />
+            <h2 className="text-xl font-bold text-white">Courses you might want to explore</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {freeResources.map((r) => (
+              <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer"
+                className="glass-card-hover p-5 group block">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="flex items-center gap-1.5 text-xs text-violet-400">
+                    <Play className="w-3 h-3" /> Free Course
+                  </span>
+                  {r.level && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${LEVEL_STYLES[r.level] || 'bg-slate-700 text-slate-300'}`}>
+                      {r.level}
+                    </span>
+                  )}
+                </div>
+                <h4 className="font-semibold text-slate-100 group-hover:text-white mb-1 transition-colors">{r.title}</h4>
+                <p className="text-sm text-slate-500">
+                  {r.instructor && `${r.instructor} · `}{r.duration}
+                </p>
+                <div className="flex items-center gap-1 mt-3 text-xs text-indigo-400 group-hover:text-indigo-300 transition-colors">
+                  <ExternalLink className="w-3 h-3" /> Watch on YouTube
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

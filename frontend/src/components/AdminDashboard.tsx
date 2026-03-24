@@ -3,7 +3,9 @@ import api from '../utils/api';
 import { companiesAPI } from '../utils/api';
 import { Company } from '../types';
 import CompanyManagement from './admin/CompanyManagement';
-import { Users, Building, Shield, Clock, BookOpen, MapPin, Trash2, KeyRound, X, Plus } from 'lucide-react';
+import FreeResourceManagement from './admin/FreeResourceManagement';
+import PackageManagement from './admin/PackageManagement';
+import { Users, Building, Shield, Clock, BookOpen, MapPin, Trash2, KeyRound, X, Plus, Library, Package } from 'lucide-react';
 
 interface User {
   id: number; username: string; email: string; is_admin: boolean; created_at: string; last_login: string | null;
@@ -16,7 +18,7 @@ interface PageTracking { page_url: string; page_title: string; time_spent: numbe
 interface UserDetails extends User { page_tracking: PageTracking[]; progress: any[]; }
 
 const AdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'users' | 'companies'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'companies' | 'content' | 'packages'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,20 +71,28 @@ const AdminDashboard: React.FC = () => {
       <h1 className="text-2xl font-bold text-white mb-6">Admin Dashboard</h1>
 
       <div className="flex gap-1 border-b border-white/10 mb-6">
-        {(['users', 'companies'] as const).map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`px-5 py-3 text-sm font-medium capitalize transition-all flex items-center gap-2
-              ${activeTab === tab ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-slate-400 hover:text-white'}`}>
-            {tab === 'users' ? <Users className="w-4 h-4" /> : <Building className="w-4 h-4" />}
-            {tab}
-          </button>
-        ))}
+        {(['users', 'companies', 'content', 'packages'] as const).map((tab) => {
+          const icons = { users: Users, companies: Building, content: Library, packages: Package };
+          const Icon = icons[tab];
+          return (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className={`px-5 py-3 text-sm font-medium capitalize transition-all flex items-center gap-2
+                ${activeTab === tab ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-slate-400 hover:text-white'}`}>
+              <Icon className="w-4 h-4" />
+              {tab === 'content' ? 'Free Resources' : tab}
+            </button>
+          );
+        })}
       </div>
 
       {error && <div className="error-banner mb-4">{error}</div>}
 
       {activeTab === 'companies' ? (
         <CompanyManagement allUsers={users.map(u => ({ id: u.id, username: u.username, email: u.email }))} />
+      ) : activeTab === 'content' ? (
+        <FreeResourceManagement />
+      ) : activeTab === 'packages' ? (
+        <PackageManagement />
       ) : (
         <>
           <div className="glass-card p-3 mb-6 flex items-center gap-3">

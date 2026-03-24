@@ -1,8 +1,11 @@
 import os
+import re
 import json
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, User, UserProgress, Company, UserCompany, CompanyDayAccess, get_accessible_days_for_user, get_public_days
+from models import (db, User, UserProgress, Company, UserCompany, CompanyDayAccess,
+                     FreeResource, CoursePackage, CoursePackageDay, CompanyPackageAccess,
+                     get_accessible_days_for_user, get_public_days)
 from auth import register_user, login_user, google_login_user
 from datetime import datetime
 from redis_kernel_manager import RedisKernelManager
@@ -751,3 +754,172 @@ def remove_company_member(company_id, user_id):
     db.session.commit()
 
     return jsonify({'success': True, 'message': 'User removed from company'}), 200
+
+
+# ========== FREE RESOURCES ==========
+
+@api.route('/public/free-resources', methods=['GET'])
+def get_public_free_resources():
+    """Get all active free resources (no auth required)"""
+    resources = FreeResource.query.filter_by(is_active=True).order_by(FreeResource.sort_order, FreeResource.id).all()
+    return jsonify({'resources': [r.to_dict() for r in resources]}), 200
+
+
+@api.route('/admin/free-resources', methods=['GET'])
+@admin_required
+def get_all_free_resources():
+    """List all free resources (admin)"""
+    resources = FreeResource.query.order_by(FreeResource.sort_order, FreeResource.id).all()
+    return jsonify({'resources': [r.to_dict() for r in resources]}), 200
+
+
+@api.route('/admin/free-resources', methods=['POST'])
+@admin_required
+def create_free_resource():
+    """Create a free resource"""
+    data = request.get_json()
+    if not data.get('title') or not data.get('url'):
+        return jsonify({'error': 'Title and URL are required'}), 400
+
+    resource = FreeResource(
+        title=data['title'],
+        description=data.get('description', ''),
+        url=data['url'],
+        duration=data.get('duration', ''),
+        instructor=data.get('instructor', ''),
+        level=data.get('level', ''),
+        category=data.get('category', ''),
+        thumbnail_url=data.get('thumbnail_url'),
+        sort_order=data.get('sort_order', 0),
+        is_active=data.get('is_active', True),
+    )
+    db.session.add(resource)
+    db.session.commit()
+    return jsonify(resource.to_dict()), 201
+
+
+@api.route('/admin/free-resources/<int:resource_id>', methods=['PUT'])
+@admin_required
+def update_free_resource(resource_id):
+    """Update a free resource"""
+    resource = FreeResource.query.get(resource_id)
+    if not resource:
+        return jsonify({'error': 'Resource not found'}), 404
+
+    data = request.get_json()
+    for field in ['title', 'description', 'url', 'duration', 'instructor', 'level', 'category', 'thumbnail_url', 'sort_order', 'is_active']:
+        if field in data:
+            setattr(resource, field, data[field])
+
+    db.session.commit()
+    return jsonify(resource.to_dict()), 200
+
+
+@api.route('/admin/free-resources/<int:resource_id>', methods=['DELETE'])
+@admin_required
+def delete_free_resource(resource_id):
+    """Delete a free resource"""
+    resource = FreeResource.query.get(resource_id)
+    if not resource:
+        return jsonify({'error': 'Resource not found'}), 404
+
+    db.session.delete(resource)
+    db.session.commit()
+    return jsonify({'success': True}), 200
+
+
+# ========== COURSE PACKAGES ==========
+
+@api.route('/admin/packages', methods=['GET'])
+@admin_required
+def get_packages():
+    """List all course packages"""
+    packages = CoursePackage.query.all()
+    return jsonify({'packages': [p.to_dict() for p in packages]}), 200
+
+
+@api.route('/admin/packages', methods=['POST'])
+@admin_required
+def create_package():
+    """Create a course package"""
+    data = request.get_json()
+    name = data.get('name')
+    if not name:
+        return jsonify({'error': 'Package name is required'}), 400
+
+    slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+    base_slug = slug
+    counter = 1
+    while CoursePackage.query.filter_by(slug=slug).first():
+        slug = f'{base_slug}-{counter}'
+        counter += 1
+
+    package = CoursePackage(
+        name=name, slug=slug,
+        description=data.get('description', ''),
+        is_active=data.get('is_active', True),
+    )
+    db.session.add(package)
+    db.session.flush()
+
+    for day_num in data.get('days', []):
+        db.session.add(CoursePackageDay(package_id=package.id, day_number=int(day_num)))
+
+    db.session.commit()
+    return jsonify(package.to_dict()), 201
+
+
+@api.route('/admin/packages/<int:package_id>', methods=['PUT'])
+@admin_required
+def update_package(package_id):
+    """Update a course package"""
+    package = CoursePackage.query.get(package_id)
+    if not package:
+        return jsonify({'error': 'Package not found'}), 404
+
+    data = request.get_json()
+    if 'name' in data:
+        package.name = data['name']
+    if 'description' in data:
+        package.description = data['description']
+    if 'is_active' in data:
+        package.is_active = bool(data['is_active'])
+    if 'days' in data:
+        CoursePackageDay.query.filter_by(package_id=package_id).delete()
+        for day_num in data['days']:
+            db.session.add(CoursePackageDay(package_id=package_id, day_number=int(day_num)))
+
+    db.session.commit()
+    return jsonify(package.to_dict()), 200
+
+
+@api.route('/admin/packages/<int:package_id>', methods=['DELETE'])
+@admin_required
+def delete_package(package_id):
+    """Delete a course package"""
+    package = CoursePackage.query.get(package_id)
+    if not package:
+        return jsonify({'error': 'Package not found'}), 404
+
+    db.session.delete(package)
+    db.session.commit()
+    return jsonify({'success': True}), 200
+
+
+@api.route('/admin/companies/<int:company_id>/packages', methods=['PUT'])
+@admin_required
+def set_company_packages(company_id):
+    """Set packages for a company (replaces all existing)"""
+    company = Company.query.get(company_id)
+    if not company:
+        return jsonify({'error': 'Company not found'}), 404
+
+    data = request.get_json()
+    package_ids = data.get('package_ids', [])
+
+    CompanyPackageAccess.query.filter_by(company_id=company_id).delete()
+    for pid in package_ids:
+        db.session.add(CompanyPackageAccess(company_id=company_id, package_id=int(pid)))
+
+    db.session.commit()
+    return jsonify(company.to_dict(include_access=True)), 200
