@@ -143,8 +143,8 @@ const Login: React.FC = () => {
           </Link>
         </p>
         <p className="text-center text-sm text-slate-600 mt-2">
-          <Link to="/browse" className="hover:text-slate-400 transition-colors">
-            Browse courses without an account
+          <Link to="/" className="hover:text-slate-400 transition-colors">
+            Back to home
           </Link>
         </p>
       </div>

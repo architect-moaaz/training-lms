@@ -1,6 +1,7 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import LandingPage from './components/LandingPage';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
@@ -26,17 +27,22 @@ const OnboardingGate: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
+// Pages that have their own navbar (landing page)
+const PAGES_WITHOUT_NAVBAR = ['/', '/landing'];
+
 const AppContent: React.FC = () => {
   usePageTracking();
+  const location = useLocation();
+  const showNavbar = !PAGES_WITHOUT_NAVBAR.includes(location.pathname);
 
   return (
     <>
-      <Navbar />
+      {showNavbar && <Navbar />}
       <Routes>
         <Route
           path="/"
           element={
-            isAuthenticated() ? <Navigate to="/dashboard" replace /> : <Navigate to="/browse" replace />
+            isAuthenticated() ? <Navigate to="/dashboard" replace /> : <LandingPage />
           }
         />
         <Route path="/browse" element={<PublicDashboard />} />
