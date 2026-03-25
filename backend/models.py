@@ -424,6 +424,210 @@ class Certificate(db.Model):
         }
 
 
+class Quiz(db.Model):
+    __tablename__ = 'quizzes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    day_number = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+    passing_score = db.Column(db.Integer, default=70)
+    time_limit_minutes = db.Column(db.Integer, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    questions = db.relationship('QuizQuestion', backref='quiz', lazy=True, cascade='all, delete-orphan',
+                                order_by='QuizQuestion.sort_order')
+
+    def to_dict(self, include_answers=False):
+        data = {
+            'id': self.id,
+            'day_number': self.day_number,
+            'title': self.title,
+            'description': self.description,
+            'passing_score': self.passing_score,
+            'time_limit_minutes': self.time_limit_minutes,
+            'is_active': self.is_active,
+            'question_count': len(self.questions),
+            'total_points': sum(q.points for q in self.questions),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+        if include_answers:
+            data['questions'] = [q.to_dict(include_answer=True) for q in self.questions]
+        return data
+
+    def to_student_dict(self):
+        """Dict for students — no correct answers exposed."""
+        return {
+            'id': self.id,
+            'day_number': self.day_number,
+            'title': self.title,
+            'description': self.description,
+            'passing_score': self.passing_score,
+            'time_limit_minutes': self.time_limit_minutes,
+            'question_count': len(self.questions),
+            'total_points': sum(q.points for q in self.questions),
+            'questions': [q.to_dict(include_answer=False) for q in self.questions],
+        }
+
+
+class QuizQuestion(db.Model):
+    __tablename__ = 'quiz_questions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quizzes.id'), nullable=False)
+    question_text = db.Column(db.Text, nullable=False)
+    question_type = db.Column(db.String(20), default='multiple_choice')
+    options = db.Column(db.Text, default='[]')  # JSON string array
+    correct_answer = db.Column(db.String(255), nullable=False)
+    points = db.Column(db.Integer, default=1)
+    sort_order = db.Column(db.Integer, default=0)
+
+    def get_options_list(self):
+        import json
+        try:
+            return json.loads(self.options)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def to_dict(self, include_answer=False):
+        data = {
+            'id': self.id,
+            'quiz_id': self.quiz_id,
+            'question_text': self.question_text,
+            'question_type': self.question_type,
+            'options': self.get_options_list(),
+            'points': self.points,
+            'sort_order': self.sort_order,
+        }
+        if include_answer:
+            data['correct_answer'] = self.correct_answer
+        return data
+
+
+class QuizAttempt(db.Model):
+    __tablename__ = 'quiz_attempts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quizzes.id'), nullable=False)
+    score = db.Column(db.Integer, default=0)
+    total_points = db.Column(db.Integer, default=0)
+    passed = db.Column(db.Boolean, default=False)
+    answers = db.Column(db.Text, default='{}')  # JSON: {question_id: selected_answer}
+    started_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('quiz_attempts', lazy=True))
+    quiz = db.relationship('Quiz', backref=db.backref('attempts', lazy=True))
+
+    def to_dict(self):
+        import json
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'quiz_id': self.quiz_id,
+            'score': self.score,
+            'total_points': self.total_points,
+            'percentage': round(self.score / self.total_points * 100) if self.total_points else 0,
+            'passed': self.passed,
+            'answers': json.loads(self.answers) if self.answers else {},
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+        }
+
+
+class Assignment(db.Model):
+    __tablename__ = 'assignments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    day_number = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+    submission_type = db.Column(db.String(20), default='text')  # text, file, both
+    max_file_size_mb = db.Column(db.Integer, default=10)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    submissions = db.relationship('Submission', backref='assignment', lazy=True, cascade='all, delete-orphan')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'day_number': self.day_number,
+            'title': self.title,
+            'description': self.description,
+            'submission_type': self.submission_type,
+            'max_file_size_mb': self.max_file_size_mb,
+            'is_active': self.is_active,
+            'submission_count': len(self.submissions),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class Submission(db.Model):
+    __tablename__ = 'submissions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    assignment_id = db.Column(db.Integer, db.ForeignKey('assignments.id'), nullable=False)
+    text_content = db.Column(db.Text, default='')
+    file_path = db.Column(db.String(500), nullable=True)
+    file_name = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(20), default='submitted')  # submitted, reviewed, returned
+    grade = db.Column(db.String(20), nullable=True)
+    feedback = db.Column(db.Text, nullable=True)
+    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    reviewed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('submissions', lazy=True))
+    reviewer = db.relationship('User', foreign_keys=[reviewed_by])
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'assignment_id', name='_user_assignment_uc'),)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'assignment_id': self.assignment_id,
+            'text_content': self.text_content,
+            'file_name': self.file_name,
+            'status': self.status,
+            'grade': self.grade,
+            'feedback': self.feedback,
+            'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
+            'reviewed_at': self.reviewed_at.isoformat() if self.reviewed_at else None,
+        }
+
+
+class ContentItemProgress(db.Model):
+    __tablename__ = 'content_item_progress'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    day_number = db.Column(db.Integer, nullable=False)
+    item_type = db.Column(db.String(20), nullable=False)  # notebook_cell, pdf_page, video
+    item_identifier = db.Column(db.String(255), nullable=False)
+    completed = db.Column(db.Boolean, default=False)
+    progress_pct = db.Column(db.Integer, default=0)
+    last_accessed = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'day_number', 'item_type', 'item_identifier',
+                                          name='_user_content_item_uc'),)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'day_number': self.day_number,
+            'item_type': self.item_type,
+            'item_identifier': self.item_identifier,
+            'completed': self.completed,
+            'progress_pct': self.progress_pct,
+            'last_accessed': self.last_accessed.isoformat() if self.last_accessed else None,
+        }
+
+
 class PasswordResetToken(db.Model):
     __tablename__ = 'password_reset_tokens'
 

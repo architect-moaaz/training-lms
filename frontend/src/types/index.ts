@@ -167,6 +167,88 @@ export interface CertificateData {
   issued_at: string;
 }
 
+export interface QuizData {
+  id: number;
+  day_number: number;
+  title: string;
+  description: string;
+  passing_score: number;
+  time_limit_minutes: number | null;
+  question_count: number;
+  total_points: number;
+  questions: QuizQuestionData[];
+  best_attempt: QuizAttemptData | null;
+}
+
+export interface QuizQuestionData {
+  id: number;
+  quiz_id: number;
+  question_text: string;
+  question_type: string;
+  options: string[];
+  points: number;
+  sort_order: number;
+  correct_answer?: string;
+}
+
+export interface QuizAttemptData {
+  id: number;
+  user_id: number;
+  quiz_id: number;
+  score: number;
+  total_points: number;
+  percentage: number;
+  passed: boolean;
+  answers: Record<string, string>;
+  completed_at: string;
+}
+
+export interface QuizSubmitResult {
+  score: number;
+  total_points: number;
+  percentage: number;
+  passed: boolean;
+  results: { question_id: number; correct: boolean; correct_answer: string; your_answer: string }[];
+  attempt: QuizAttemptData;
+}
+
+export interface AssignmentData {
+  id: number;
+  day_number: number;
+  title: string;
+  description: string;
+  submission_type: string;
+  max_file_size_mb: number;
+  is_active: boolean;
+  submission_count: number;
+  my_submission: SubmissionData | null;
+  created_at: string;
+}
+
+export interface SubmissionData {
+  id: number;
+  user_id: number;
+  assignment_id: number;
+  text_content: string;
+  file_name: string | null;
+  status: string;
+  grade: string | null;
+  feedback: string | null;
+  submitted_at: string;
+  reviewed_at: string | null;
+}
+
+export interface ContentItemProgressData {
+  id: number;
+  user_id: number;
+  day_number: number;
+  item_type: string;
+  item_identifier: string;
+  completed: boolean;
+  progress_pct: number;
+  last_accessed: string;
+}
+
 export interface NotebookCell {
   cell_type: 'code' | 'markdown' | 'raw';
   source: string | string[];

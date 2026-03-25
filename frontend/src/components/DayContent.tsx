@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { daysAPI, progressAPI } from '../utils/api';
-import { DayContent as DayContentType, VideoContent } from '../types';
+import { daysAPI, progressAPI, quizAPI, assignmentAPI } from '../utils/api';
+import { DayContent as DayContentType, VideoContent, QuizData, AssignmentData, ContentItemProgressData } from '../types';
 import NotebookViewer from './NotebookViewer';
 import PDFViewer from './PDFViewer';
-import { ArrowLeft, Play, BookOpen, FileText, ChevronRight, Check } from 'lucide-react';
+import QuizViewer from './QuizViewer';
+import AssignmentSubmit from './AssignmentSubmit';
+import { ArrowLeft, Play, BookOpen, FileText, ChevronRight, Check, ClipboardList, FileUp } from 'lucide-react';
 
 const getYouTubeEmbedUrl = (url: string): string | null => {
   const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
@@ -31,11 +33,26 @@ const DayContent: React.FC = () => {
   const [selectedVideo, setSelectedVideo] = useState<VideoContent | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  useEffect(() => { if (dayNumber) { fetchContent(); checkProgress(); } }, [dayNumber]);
+  // Phase 4 state
+  const [quiz, setQuiz] = useState<QuizData | null>(null);
+  const [assignment, setAssignment] = useState<AssignmentData | null>(null);
+  const [itemProgress, setItemProgress] = useState<ContentItemProgressData[]>([]);
+
+  const dayNum = Number(dayNumber);
+
+  useEffect(() => {
+    if (dayNumber) {
+      fetchContent();
+      checkProgress();
+      fetchQuiz();
+      fetchAssignment();
+      fetchItemProgress();
+    }
+  }, [dayNumber]);
 
   const fetchContent = async () => {
     setLoading(true);
-    try { setContent(await daysAPI.getDayContent(Number(dayNumber))); }
+    try { setContent(await daysAPI.getDayContent(dayNum)); }
     catch (err: any) { setError(err.response?.status === 403 ? 'Access denied.' : 'Failed to load content.'); }
     finally { setLoading(false); }
   };
@@ -43,13 +60,33 @@ const DayContent: React.FC = () => {
   const checkProgress = async () => {
     try {
       const progressData = await progressAPI.getProgress();
-      setIsCompleted(progressData.find((p) => p.day_number === Number(dayNumber))?.completed || false);
+      setIsCompleted(progressData.find((p) => p.day_number === dayNum)?.completed || false);
+    } catch {}
+  };
+
+  const fetchQuiz = async () => {
+    try {
+      const res = await quizAPI.getDayQuiz(dayNum);
+      setQuiz(res.quiz);
+    } catch {}
+  };
+
+  const fetchAssignment = async () => {
+    try {
+      const res = await assignmentAPI.getDayAssignment(dayNum);
+      setAssignment(res.assignment);
+    } catch {}
+  };
+
+  const fetchItemProgress = async () => {
+    try {
+      setItemProgress(await progressAPI.getItemProgress(dayNum));
     } catch {}
   };
 
   const handleMarkComplete = async () => {
     try {
-      await progressAPI.updateProgress(Number(dayNumber), { completed: !isCompleted });
+      await progressAPI.updateProgress(dayNum, { completed: !isCompleted });
       setIsCompleted(!isCompleted);
     } catch {}
   };
@@ -64,6 +101,10 @@ const DayContent: React.FC = () => {
 
   const handleClose = () => { setSelectedNotebook(null); setSelectedPDF(null); setSelectedVideo(null); };
 
+  // Compute granular progress summary
+  const completedItems = itemProgress.filter(i => i.completed).length;
+  const totalItems = itemProgress.length;
+
   if (loading) return <div className="flex-1 flex items-center justify-center text-slate-400">Loading content...</div>;
 
   if (error || !content) {
@@ -75,8 +116,8 @@ const DayContent: React.FC = () => {
     );
   }
 
-  if (selectedNotebook) return <NotebookViewer dayNumber={Number(dayNumber)} filename={selectedNotebook} onClose={handleClose} />;
-  if (selectedPDF) return <PDFViewer dayNumber={Number(dayNumber)} filename={selectedPDF} onClose={handleClose} />;
+  if (selectedNotebook) return <NotebookViewer dayNumber={dayNum} filename={selectedNotebook} onClose={handleClose} />;
+  if (selectedPDF) return <PDFViewer dayNumber={dayNum} filename={selectedPDF} onClose={handleClose} />;
 
   if (selectedVideo) {
     const embedUrl = getYouTubeEmbedUrl(selectedVideo.url);
@@ -115,6 +156,15 @@ const DayContent: React.FC = () => {
             )}
           </div>
           {content.description && <p className="text-slate-400">{content.description}</p>}
+          {totalItems > 0 && (
+            <div className="flex items-center gap-3 mt-2">
+              <div className="w-32 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-500 rounded-full transition-all"
+                  style={{ width: `${totalItems ? (completedItems / totalItems * 100) : 0}%` }} />
+              </div>
+              <span className="text-xs text-slate-500">{completedItems}/{totalItems} items</span>
+            </div>
+          )}
         </div>
         <button onClick={handleMarkComplete}
           className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-200 shrink-0
@@ -126,6 +176,7 @@ const DayContent: React.FC = () => {
       </div>
 
       <div className="space-y-8">
+        {/* Videos */}
         {content.videos && content.videos.length > 0 && (
           <section>
             <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
@@ -149,6 +200,7 @@ const DayContent: React.FC = () => {
           </section>
         )}
 
+        {/* Notebooks */}
         {content.notebooks.length > 0 && (
           <section>
             <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
@@ -169,6 +221,7 @@ const DayContent: React.FC = () => {
           </section>
         )}
 
+        {/* PDFs */}
         {content.pdfs.length > 0 && (
           <section>
             <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
@@ -189,7 +242,27 @@ const DayContent: React.FC = () => {
           </section>
         )}
 
-        {content.notebooks.length === 0 && content.pdfs.length === 0 && (!content.videos || content.videos.length === 0) && (
+        {/* Quiz */}
+        {quiz && (
+          <section>
+            <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
+              <ClipboardList className="w-5 h-5 text-violet-400" /> Quiz
+            </h2>
+            <QuizViewer quiz={quiz} onComplete={fetchQuiz} />
+          </section>
+        )}
+
+        {/* Assignment */}
+        {assignment && (
+          <section>
+            <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
+              <FileUp className="w-5 h-5 text-violet-400" /> Assignment
+            </h2>
+            <AssignmentSubmit assignment={assignment} onSubmitted={fetchAssignment} />
+          </section>
+        )}
+
+        {content.notebooks.length === 0 && content.pdfs.length === 0 && (!content.videos || content.videos.length === 0) && !quiz && !assignment && (
           <div className="text-center py-12 text-slate-400">No content available for this day yet.</div>
         )}
       </div>

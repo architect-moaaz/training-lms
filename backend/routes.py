@@ -8,6 +8,8 @@ from models import (db, User, UserProgress, UserProfile, Company, UserCompany, C
                      Event, FreeResource, UserFreeResourceEnrollment,
                      CoursePackage, CoursePackageDay, CompanyPackageAccess,
                      CertificateTemplate, Certificate, PasswordResetToken,
+                     Quiz, QuizQuestion, QuizAttempt,
+                     Assignment, Submission, ContentItemProgress,
                      get_accessible_days_for_user, get_public_days)
 from auth import register_user, login_user, google_login_user, hash_password
 from email_service import send_password_reset_email, send_verification_email
@@ -1635,3 +1637,358 @@ def delete_event(event_id):
     db.session.delete(event)
     db.session.commit()
     return jsonify({'success': True}), 200
+
+
+# ── Quiz Management (Admin) ──
+
+@api.route('/admin/quizzes', methods=['GET'])
+@admin_required
+def admin_list_quizzes():
+    quizzes = Quiz.query.order_by(Quiz.day_number).all()
+    return jsonify({'quizzes': [q.to_dict(include_answers=True) for q in quizzes]}), 200
+
+
+@api.route('/admin/quizzes', methods=['POST'])
+@admin_required
+def admin_create_quiz():
+    data = request.get_json()
+    quiz = Quiz(
+        day_number=data['day_number'],
+        title=data['title'],
+        description=data.get('description', ''),
+        passing_score=data.get('passing_score', 70),
+        time_limit_minutes=data.get('time_limit_minutes'),
+    )
+    db.session.add(quiz)
+    db.session.flush()
+
+    for i, q in enumerate(data.get('questions', [])):
+        question = QuizQuestion(
+            quiz_id=quiz.id,
+            question_text=q['question_text'],
+            question_type=q.get('question_type', 'multiple_choice'),
+            options=json.dumps(q.get('options', [])),
+            correct_answer=q['correct_answer'],
+            points=q.get('points', 1),
+            sort_order=i,
+        )
+        db.session.add(question)
+
+    db.session.commit()
+    return jsonify(quiz.to_dict(include_answers=True)), 201
+
+
+@api.route('/admin/quizzes/<int:quiz_id>', methods=['PUT'])
+@admin_required
+def admin_update_quiz(quiz_id):
+    quiz = Quiz.query.get(quiz_id)
+    if not quiz:
+        return jsonify({'error': 'Quiz not found'}), 404
+
+    data = request.get_json()
+    for field in ['title', 'description', 'passing_score', 'time_limit_minutes', 'is_active', 'day_number']:
+        if field in data:
+            setattr(quiz, field, data[field])
+
+    if 'questions' in data:
+        QuizQuestion.query.filter_by(quiz_id=quiz.id).delete()
+        for i, q in enumerate(data['questions']):
+            question = QuizQuestion(
+                quiz_id=quiz.id,
+                question_text=q['question_text'],
+                question_type=q.get('question_type', 'multiple_choice'),
+                options=json.dumps(q.get('options', [])),
+                correct_answer=q['correct_answer'],
+                points=q.get('points', 1),
+                sort_order=i,
+            )
+            db.session.add(question)
+
+    db.session.commit()
+    return jsonify(quiz.to_dict(include_answers=True)), 200
+
+
+@api.route('/admin/quizzes/<int:quiz_id>', methods=['DELETE'])
+@admin_required
+def admin_delete_quiz(quiz_id):
+    quiz = Quiz.query.get(quiz_id)
+    if not quiz:
+        return jsonify({'error': 'Quiz not found'}), 404
+    db.session.delete(quiz)
+    db.session.commit()
+    return jsonify({'success': True}), 200
+
+
+@api.route('/admin/quizzes/<int:quiz_id>/attempts', methods=['GET'])
+@admin_required
+def admin_quiz_attempts(quiz_id):
+    attempts = QuizAttempt.query.filter_by(quiz_id=quiz_id).order_by(QuizAttempt.completed_at.desc()).all()
+    result = []
+    for a in attempts:
+        d = a.to_dict()
+        d['username'] = a.user.username if a.user else 'Unknown'
+        result.append(d)
+    return jsonify({'attempts': result}), 200
+
+
+# ── Quiz (Student) ──
+
+@api.route('/days/<int:day_number>/quiz', methods=['GET'])
+@jwt_required()
+def get_day_quiz(day_number):
+    user_id = int(get_jwt_identity())
+    access_error = _check_day_access(user_id, day_number)
+    if access_error:
+        return access_error
+
+    quiz = Quiz.query.filter_by(day_number=day_number, is_active=True).first()
+    if not quiz:
+        return jsonify({'quiz': None}), 200
+
+    data = quiz.to_student_dict()
+
+    # Include user's best attempt
+    best = QuizAttempt.query.filter_by(user_id=user_id, quiz_id=quiz.id)\
+        .order_by(QuizAttempt.score.desc()).first()
+    data['best_attempt'] = best.to_dict() if best else None
+
+    return jsonify({'quiz': data}), 200
+
+
+@api.route('/quizzes/<int:quiz_id>/submit', methods=['POST'])
+@jwt_required()
+def submit_quiz(quiz_id):
+    user_id = int(get_jwt_identity())
+    quiz = Quiz.query.get(quiz_id)
+    if not quiz or not quiz.is_active:
+        return jsonify({'error': 'Quiz not found'}), 404
+
+    data = request.get_json()
+    answers = data.get('answers', {})  # {question_id: selected_answer}
+
+    score = 0
+    total = 0
+    results = []
+    for q in quiz.questions:
+        total += q.points
+        user_answer = answers.get(str(q.id), '')
+        correct = user_answer.strip().lower() == q.correct_answer.strip().lower()
+        if correct:
+            score += q.points
+        results.append({
+            'question_id': q.id,
+            'correct': correct,
+            'correct_answer': q.correct_answer,
+            'your_answer': user_answer,
+        })
+
+    percentage = round(score / total * 100) if total else 0
+    passed = percentage >= quiz.passing_score
+
+    attempt = QuizAttempt(
+        user_id=user_id,
+        quiz_id=quiz.id,
+        score=score,
+        total_points=total,
+        passed=passed,
+        answers=json.dumps(answers),
+    )
+    db.session.add(attempt)
+    db.session.commit()
+
+    return jsonify({
+        'score': score,
+        'total_points': total,
+        'percentage': percentage,
+        'passed': passed,
+        'results': results,
+        'attempt': attempt.to_dict(),
+    }), 200
+
+
+# ── Assignment Management (Admin) ──
+
+@api.route('/admin/assignments', methods=['GET'])
+@admin_required
+def admin_list_assignments():
+    assignments = Assignment.query.order_by(Assignment.day_number).all()
+    return jsonify({'assignments': [a.to_dict() for a in assignments]}), 200
+
+
+@api.route('/admin/assignments', methods=['POST'])
+@admin_required
+def admin_create_assignment():
+    data = request.get_json()
+    assignment = Assignment(
+        day_number=data['day_number'],
+        title=data['title'],
+        description=data.get('description', ''),
+        submission_type=data.get('submission_type', 'text'),
+        max_file_size_mb=data.get('max_file_size_mb', 10),
+    )
+    db.session.add(assignment)
+    db.session.commit()
+    return jsonify(assignment.to_dict()), 201
+
+
+@api.route('/admin/assignments/<int:assignment_id>', methods=['PUT'])
+@admin_required
+def admin_update_assignment(assignment_id):
+    assignment = Assignment.query.get(assignment_id)
+    if not assignment:
+        return jsonify({'error': 'Assignment not found'}), 404
+
+    data = request.get_json()
+    for field in ['title', 'description', 'submission_type', 'max_file_size_mb', 'is_active', 'day_number']:
+        if field in data:
+            setattr(assignment, field, data[field])
+
+    db.session.commit()
+    return jsonify(assignment.to_dict()), 200
+
+
+@api.route('/admin/assignments/<int:assignment_id>', methods=['DELETE'])
+@admin_required
+def admin_delete_assignment(assignment_id):
+    assignment = Assignment.query.get(assignment_id)
+    if not assignment:
+        return jsonify({'error': 'Assignment not found'}), 404
+    db.session.delete(assignment)
+    db.session.commit()
+    return jsonify({'success': True}), 200
+
+
+@api.route('/admin/submissions', methods=['GET'])
+@admin_required
+def admin_list_submissions():
+    subs = Submission.query.order_by(Submission.submitted_at.desc()).all()
+    result = []
+    for s in subs:
+        d = s.to_dict()
+        d['username'] = s.user.username if s.user else 'Unknown'
+        d['assignment_title'] = s.assignment.title if s.assignment else 'Unknown'
+        d['day_number'] = s.assignment.day_number if s.assignment else None
+        result.append(d)
+    return jsonify({'submissions': result}), 200
+
+
+@api.route('/admin/submissions/<int:submission_id>/review', methods=['PUT'])
+@admin_required
+def admin_review_submission(submission_id):
+    sub = Submission.query.get(submission_id)
+    if not sub:
+        return jsonify({'error': 'Submission not found'}), 404
+
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+    sub.grade = data.get('grade', sub.grade)
+    sub.feedback = data.get('feedback', sub.feedback)
+    sub.status = 'reviewed'
+    sub.reviewed_at = datetime.utcnow()
+    sub.reviewed_by = user_id
+    db.session.commit()
+    return jsonify(sub.to_dict()), 200
+
+
+# ── Assignment (Student) ──
+
+@api.route('/days/<int:day_number>/assignment', methods=['GET'])
+@jwt_required()
+def get_day_assignment(day_number):
+    user_id = int(get_jwt_identity())
+    access_error = _check_day_access(user_id, day_number)
+    if access_error:
+        return access_error
+
+    assignment = Assignment.query.filter_by(day_number=day_number, is_active=True).first()
+    if not assignment:
+        return jsonify({'assignment': None}), 200
+
+    data = assignment.to_dict()
+    sub = Submission.query.filter_by(user_id=user_id, assignment_id=assignment.id).first()
+    data['my_submission'] = sub.to_dict() if sub else None
+    return jsonify({'assignment': data}), 200
+
+
+@api.route('/assignments/<int:assignment_id>/submit', methods=['POST'])
+@jwt_required()
+def submit_assignment(assignment_id):
+    user_id = int(get_jwt_identity())
+    assignment = Assignment.query.get(assignment_id)
+    if not assignment or not assignment.is_active:
+        return jsonify({'error': 'Assignment not found'}), 404
+
+    existing = Submission.query.filter_by(user_id=user_id, assignment_id=assignment_id).first()
+    if existing:
+        return jsonify({'error': 'You have already submitted this assignment'}), 400
+
+    text_content = request.form.get('text_content', '')
+    file_path_saved = None
+    file_name_saved = None
+
+    if 'file' in request.files:
+        file = request.files['file']
+        if file.filename:
+            from werkzeug.utils import secure_filename
+            filename = secure_filename(file.filename)
+            upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                      'uploads', 'submissions', str(assignment_id), str(user_id))
+            os.makedirs(upload_dir, exist_ok=True)
+            fpath = os.path.join(upload_dir, filename)
+            file.save(fpath)
+            file_path_saved = fpath
+            file_name_saved = filename
+
+    sub = Submission(
+        user_id=user_id,
+        assignment_id=assignment_id,
+        text_content=text_content,
+        file_path=file_path_saved,
+        file_name=file_name_saved,
+    )
+    db.session.add(sub)
+    db.session.commit()
+    return jsonify(sub.to_dict()), 201
+
+
+# ── Granular Progress ──
+
+@api.route('/progress/<int:day_number>/items', methods=['GET'])
+@jwt_required()
+def get_item_progress(day_number):
+    user_id = int(get_jwt_identity())
+    items = ContentItemProgress.query.filter_by(user_id=user_id, day_number=day_number).all()
+    return jsonify({'items': [i.to_dict() for i in items]}), 200
+
+
+@api.route('/progress/<int:day_number>/item', methods=['POST'])
+@jwt_required()
+def update_item_progress(day_number):
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+    item_type = data.get('item_type')
+    item_identifier = data.get('item_identifier')
+
+    if not item_type or not item_identifier:
+        return jsonify({'error': 'item_type and item_identifier required'}), 400
+
+    item = ContentItemProgress.query.filter_by(
+        user_id=user_id, day_number=day_number,
+        item_type=item_type, item_identifier=item_identifier
+    ).first()
+
+    if not item:
+        item = ContentItemProgress(
+            user_id=user_id, day_number=day_number,
+            item_type=item_type, item_identifier=item_identifier
+        )
+        db.session.add(item)
+
+    if 'completed' in data:
+        item.completed = data['completed']
+    if 'progress_pct' in data:
+        item.progress_pct = data['progress_pct']
+    item.last_accessed = datetime.utcnow()
+
+    db.session.commit()
+    return jsonify(item.to_dict()), 200

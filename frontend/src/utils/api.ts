@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage, CertificateData, CertificateTemplate, EventData } from '../types';
+import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage, CertificateData, CertificateTemplate, EventData, QuizData, QuizSubmitResult, AssignmentData, ContentItemProgressData } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -165,6 +165,105 @@ export const progressAPI = {
     data: { completed?: boolean; time_spent?: number }
   ): Promise<UserProgress> => {
     const response = await api.post(`/progress/${dayNumber}`, data);
+    return response.data;
+  },
+
+  getItemProgress: async (dayNumber: number): Promise<ContentItemProgressData[]> => {
+    const response = await api.get(`/progress/${dayNumber}/items`);
+    return response.data.items;
+  },
+
+  updateItemProgress: async (dayNumber: number, data: {
+    item_type: string;
+    item_identifier: string;
+    completed?: boolean;
+    progress_pct?: number;
+  }): Promise<ContentItemProgressData> => {
+    const response = await api.post(`/progress/${dayNumber}/item`, data);
+    return response.data;
+  },
+};
+
+export const quizAPI = {
+  getDayQuiz: async (dayNumber: number): Promise<{ quiz: QuizData | null }> => {
+    const response = await api.get(`/days/${dayNumber}/quiz`);
+    return response.data;
+  },
+
+  submitQuiz: async (quizId: number, answers: Record<string, string>): Promise<QuizSubmitResult> => {
+    const response = await api.post(`/quizzes/${quizId}/submit`, { answers });
+    return response.data;
+  },
+
+  // Admin
+  listQuizzes: async (): Promise<any> => {
+    const response = await api.get('/admin/quizzes');
+    return response.data;
+  },
+
+  createQuiz: async (data: any): Promise<any> => {
+    const response = await api.post('/admin/quizzes', data);
+    return response.data;
+  },
+
+  updateQuiz: async (id: number, data: any): Promise<any> => {
+    const response = await api.put(`/admin/quizzes/${id}`, data);
+    return response.data;
+  },
+
+  deleteQuiz: async (id: number): Promise<void> => {
+    await api.delete(`/admin/quizzes/${id}`);
+  },
+
+  getAttempts: async (quizId: number): Promise<any> => {
+    const response = await api.get(`/admin/quizzes/${quizId}/attempts`);
+    return response.data;
+  },
+};
+
+export const assignmentAPI = {
+  getDayAssignment: async (dayNumber: number): Promise<{ assignment: AssignmentData | null }> => {
+    const response = await api.get(`/days/${dayNumber}/assignment`);
+    return response.data;
+  },
+
+  submitAssignment: async (assignmentId: number, data: { text_content?: string; file?: File }): Promise<any> => {
+    const formData = new FormData();
+    if (data.text_content) formData.append('text_content', data.text_content);
+    if (data.file) formData.append('file', data.file);
+    const response = await api.post(`/assignments/${assignmentId}/submit`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // Admin
+  listAssignments: async (): Promise<any> => {
+    const response = await api.get('/admin/assignments');
+    return response.data;
+  },
+
+  createAssignment: async (data: any): Promise<any> => {
+    const response = await api.post('/admin/assignments', data);
+    return response.data;
+  },
+
+  updateAssignment: async (id: number, data: any): Promise<any> => {
+    const response = await api.put(`/admin/assignments/${id}`, data);
+    return response.data;
+  },
+
+  deleteAssignment: async (id: number): Promise<void> => {
+    await api.delete(`/admin/assignments/${id}`);
+  },
+
+  listSubmissions: async (): Promise<any> => {
+    const response = await api.get('/admin/submissions');
+    return response.data;
+  },
+
+  reviewSubmission: async (id: number, data: { grade: string; feedback: string }): Promise<any> => {
+    const response = await api.put(`/admin/submissions/${id}/review`, data);
     return response.data;
   },
 };
