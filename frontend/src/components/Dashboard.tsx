@@ -5,6 +5,8 @@ import { Day, UserProgress, FreeResource } from '../types';
 import { getAuthData } from '../utils/auth';
 import { BookOpen, FileText, Play, Check, ChevronRight, Sparkles, Plus, Clock, User } from 'lucide-react';
 import MyCertificates from './MyCertificates';
+import Recommendations from './Recommendations';
+import BadgeDisplay from './BadgeDisplay';
 
 const LEVEL_STYLES: Record<string, string> = {
   beginner: 'bg-emerald-500/10 text-emerald-400',
@@ -114,6 +116,12 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ========== RECOMMENDATIONS ========== */}
+      <Recommendations />
+
+      {/* ========== BADGES ========== */}
+      <BadgeDisplay />
 
       {/* ========== CERTIFICATES ========== */}
       <MyCertificates />

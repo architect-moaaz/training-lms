@@ -628,6 +628,58 @@ class ContentItemProgress(db.Model):
         }
 
 
+class BadgeDefinition(db.Model):
+    __tablename__ = 'badge_definitions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+    icon = db.Column(db.String(50), default='award')  # Lucide icon name
+    criteria_type = db.Column(db.String(50), nullable=False)  # days_completed, quizzes_passed, time_spent, first_login
+    criteria_value = db.Column(db.Integer, default=1)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user_badges = db.relationship('UserBadge', backref='badge', lazy=True, cascade='all, delete-orphan')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'icon': self.icon,
+            'criteria_type': self.criteria_type,
+            'criteria_value': self.criteria_value,
+            'is_active': self.is_active,
+            'earned_count': len(self.user_badges),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class UserBadge(db.Model):
+    __tablename__ = 'user_badges'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    badge_id = db.Column(db.Integer, db.ForeignKey('badge_definitions.id'), nullable=False)
+    earned_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('badges', lazy=True))
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'badge_id', name='_user_badge_uc'),)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'badge_id': self.badge_id,
+            'badge_name': self.badge.name if self.badge else '',
+            'badge_description': self.badge.description if self.badge else '',
+            'badge_icon': self.badge.icon if self.badge else 'award',
+            'earned_at': self.earned_at.isoformat() if self.earned_at else None,
+        }
+
+
 class Comment(db.Model):
     __tablename__ = 'comments'
 

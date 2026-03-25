@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { analyticsAPI } from '../../utils/api';
-import { Users, Clock, BookOpen, Building, Globe, BarChart3, TrendingUp, Sparkles } from 'lucide-react';
+import { Users, Clock, BookOpen, Building, Globe, BarChart3, TrendingUp, Sparkles, Download } from 'lucide-react';
 
 const Analytics: React.FC = () => {
   const [data, setData] = useState<any>(null);
@@ -48,8 +49,33 @@ const Analytics: React.FC = () => {
 
   const { overview, demographics, registrations_by_date, company_distribution } = data;
 
+  const handleExportCSV = async () => {
+    try {
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const token = localStorage.getItem('access_token');
+      const response = await axios.get(`${API_URL}/admin/analytics/export?format=csv`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'spark10k_analytics.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch { alert('Export failed'); }
+  };
+
   return (
     <div className="space-y-8">
+      {/* Export Button */}
+      <div className="flex justify-end">
+        <button onClick={handleExportCSV}
+          className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 px-4 py-2 rounded-xl text-sm transition-all">
+          <Download className="w-4 h-4" /> Export CSV
+        </button>
+      </div>
+
       {/* Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[

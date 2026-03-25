@@ -249,6 +249,38 @@ export interface ContentItemProgressData {
   last_accessed: string;
 }
 
+export interface BadgeData {
+  id: number;
+  user_id: number;
+  badge_id: number;
+  badge_name: string;
+  badge_description: string;
+  badge_icon: string;
+  earned_at: string;
+}
+
+export interface BadgeDefinitionData {
+  id: number;
+  name: string;
+  description: string;
+  icon: string;
+  criteria_type: string;
+  criteria_value: number;
+  is_active: boolean;
+  earned_count: number;
+  created_at: string;
+}
+
+export interface RecommendationData {
+  day_number?: number;
+  id?: number;
+  title: string;
+  description: string;
+  level?: string;
+  reason: string;
+  type?: string;
+}
+
 export interface CommentData {
   id: number;
   user_id: number;

@@ -10,7 +10,9 @@ from models import (db, User, UserProgress, UserProfile, Company, UserCompany, C
                      CertificateTemplate, Certificate, PasswordResetToken,
                      Quiz, QuizQuestion, QuizAttempt,
                      Assignment, Submission, ContentItemProgress, Comment,
+                     BadgeDefinition, UserBadge,
                      get_accessible_days_for_user, get_public_days)
+import csv
 from auth import register_user, login_user, google_login_user, hash_password
 from email_service import send_password_reset_email, send_verification_email
 from datetime import datetime
@@ -2125,3 +2127,245 @@ def search():
         'resources': resource_results[:10],
         'total': len(day_results) + len(resource_results),
     }), 200
+
+
+# ── Analytics Export (#13) ──
+
+@api.route('/admin/analytics/export', methods=['GET'])
+@jwt_required()
+def export_analytics():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user or not user.is_admin:
+        return jsonify({'error': 'Admin access required'}), 403
+    fmt = request.args.get('format', 'csv')
+    from models import PageTimeTracking
+
+    if fmt == 'csv':
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['ID', 'Username', 'Email', 'Country', 'City', 'Organization',
+                         'Experience Level', 'Registered', 'Last Login',
+                         'Days Completed', 'Total Time (min)', 'Email Verified'])
+
+        users = User.query.all()
+        for u in users:
+            profile = UserProfile.query.filter_by(user_id=u.id).first()
+            progress = UserProgress.query.filter_by(user_id=u.id).all()
+            tracking = PageTimeTracking.query.filter_by(user_id=u.id).all()
+            completed = sum(1 for p in progress if p.completed)
+            total_time = sum(t.time_spent for t in tracking)
+            writer.writerow([
+                u.id, u.username, u.email,
+                profile.country if profile else '',
+                profile.city if profile else '',
+                profile.organization if profile else '',
+                profile.experience_level if profile else '',
+                u.created_at.strftime('%Y-%m-%d') if u.created_at else '',
+                u.last_login.strftime('%Y-%m-%d') if u.last_login else 'Never',
+                completed,
+                round(total_time / 60, 1),
+                'Yes' if u.email_verified else 'No',
+            ])
+
+        output.seek(0)
+        return send_file(
+            io.BytesIO(output.getvalue().encode('utf-8')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name='spark10k_analytics.csv'
+        )
+
+    return jsonify({'error': 'Unsupported format. Use ?format=csv'}), 400
+
+
+# ── Recommendations (#14) ──
+
+@api.route('/recommendations', methods=['GET'])
+@jwt_required()
+def get_recommendations():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'recommendations': []}), 200
+
+    profile = UserProfile.query.filter_by(user_id=user_id).first()
+    user_level = profile.experience_level if profile else ''
+
+    accessible_days = get_accessible_days_for_user(user_id)
+    completed_progress = UserProgress.query.filter_by(user_id=user_id).all()
+    completed_set = {p.day_number for p in completed_progress if p.completed}
+    started_set = {p.day_number for p in completed_progress}
+
+    # Scan available days
+    public_folder = _get_public_folder()
+    available_days = []
+    if os.path.exists(public_folder):
+        for item in sorted(os.listdir(public_folder)):
+            if not item.startswith('day') or not os.path.isdir(os.path.join(public_folder, item)):
+                continue
+            try:
+                day_num = int(item.replace('day', ''))
+            except ValueError:
+                continue
+            if accessible_days is not None and day_num not in accessible_days:
+                continue
+
+            meta_path = os.path.join(public_folder, item, 'metadata.json')
+            title = f'Day {day_num}'
+            description = ''
+            level = ''
+            if os.path.exists(meta_path):
+                with open(meta_path, 'r') as f:
+                    meta = json.load(f)
+                    title = meta.get('title', title)
+                    description = meta.get('description', '')
+                    level = meta.get('level', '')
+
+            available_days.append({
+                'day_number': day_num,
+                'title': title,
+                'description': description,
+                'level': level,
+                'completed': day_num in completed_set,
+                'started': day_num in started_set,
+            })
+
+    recommendations = []
+
+    # 1. Continue where you left off (started but not completed)
+    in_progress = [d for d in available_days if d['started'] and not d['completed']]
+    for d in in_progress[:2]:
+        recommendations.append({**d, 'reason': 'Continue where you left off'})
+
+    # 2. Next sequential uncompleted day
+    uncompleted = [d for d in available_days if not d['completed'] and not d['started']]
+    for d in uncompleted[:2]:
+        recommendations.append({**d, 'reason': 'Next in your learning path'})
+
+    # 3. Level-matched content
+    if user_level:
+        level_matched = [d for d in uncompleted if d['level'] == user_level
+                         and d['day_number'] not in {r['day_number'] for r in recommendations}]
+        for d in level_matched[:2]:
+            recommendations.append({**d, 'reason': f'Recommended for {user_level} level'})
+
+    # 4. Unstarted free resources
+    enrolled_ids = {e.resource_id for e in UserFreeResourceEnrollment.query.filter_by(user_id=user_id).all()}
+    unstarted_resources = FreeResource.query.filter(
+        FreeResource.is_active == True,
+        ~FreeResource.id.in_(enrolled_ids) if enrolled_ids else True
+    ).limit(3).all()
+    for r in unstarted_resources:
+        recommendations.append({
+            'type': 'resource',
+            'id': r.id,
+            'title': r.title,
+            'description': r.description,
+            'level': r.level,
+            'reason': 'Free course you haven\'t started',
+        })
+
+    return jsonify({'recommendations': recommendations[:8]}), 200
+
+
+# ── Badges (#15) ──
+
+def _check_and_award_badges(user_id):
+    """Evaluate all active badges and award new ones. Returns newly awarded badges."""
+    badges = BadgeDefinition.query.filter_by(is_active=True).all()
+    existing = {ub.badge_id for ub in UserBadge.query.filter_by(user_id=user_id).all()}
+    newly_awarded = []
+
+    progress = UserProgress.query.filter_by(user_id=user_id).all()
+    completed_days = sum(1 for p in progress if p.completed)
+    quiz_attempts = QuizAttempt.query.filter_by(user_id=user_id).all()
+    quizzes_passed = len({a.quiz_id for a in quiz_attempts if a.passed})
+
+    from models import PageTimeTracking
+    total_time_min = sum(t.time_spent for t in PageTimeTracking.query.filter_by(user_id=user_id).all()) / 60
+
+    for badge in badges:
+        if badge.id in existing:
+            continue
+
+        earned = False
+        if badge.criteria_type == 'days_completed':
+            earned = completed_days >= badge.criteria_value
+        elif badge.criteria_type == 'quizzes_passed':
+            earned = quizzes_passed >= badge.criteria_value
+        elif badge.criteria_type == 'time_spent':
+            earned = total_time_min >= badge.criteria_value
+        elif badge.criteria_type == 'first_login':
+            earned = True  # If user exists, they've logged in
+
+        if earned:
+            ub = UserBadge(user_id=user_id, badge_id=badge.id)
+            db.session.add(ub)
+            newly_awarded.append(badge.to_dict())
+
+    if newly_awarded:
+        db.session.commit()
+    return newly_awarded
+
+
+@api.route('/badges/my', methods=['GET'])
+@jwt_required()
+def get_my_badges():
+    user_id = int(get_jwt_identity())
+    # Check for new badges
+    new_badges = _check_and_award_badges(user_id)
+    # Return all
+    user_badges = UserBadge.query.filter_by(user_id=user_id).order_by(UserBadge.earned_at.desc()).all()
+    return jsonify({
+        'badges': [ub.to_dict() for ub in user_badges],
+        'new_badges': new_badges,
+    }), 200
+
+
+@api.route('/admin/badges', methods=['GET'])
+@admin_required
+def admin_list_badges():
+    badges = BadgeDefinition.query.all()
+    return jsonify({'badges': [b.to_dict() for b in badges]}), 200
+
+
+@api.route('/admin/badges', methods=['POST'])
+@admin_required
+def admin_create_badge():
+    data = request.get_json()
+    badge = BadgeDefinition(
+        name=data['name'],
+        description=data.get('description', ''),
+        icon=data.get('icon', 'award'),
+        criteria_type=data['criteria_type'],
+        criteria_value=data.get('criteria_value', 1),
+    )
+    db.session.add(badge)
+    db.session.commit()
+    return jsonify(badge.to_dict()), 201
+
+
+@api.route('/admin/badges/<int:badge_id>', methods=['PUT'])
+@admin_required
+def admin_update_badge(badge_id):
+    badge = BadgeDefinition.query.get(badge_id)
+    if not badge:
+        return jsonify({'error': 'Badge not found'}), 404
+    data = request.get_json()
+    for field in ['name', 'description', 'icon', 'criteria_type', 'criteria_value', 'is_active']:
+        if field in data:
+            setattr(badge, field, data[field])
+    db.session.commit()
+    return jsonify(badge.to_dict()), 200
+
+
+@api.route('/admin/badges/<int:badge_id>', methods=['DELETE'])
+@admin_required
+def admin_delete_badge(badge_id):
+    badge = BadgeDefinition.query.get(badge_id)
+    if not badge:
+        return jsonify({'error': 'Badge not found'}), 404
+    db.session.delete(badge)
+    db.session.commit()
+    return jsonify({'success': True}), 200

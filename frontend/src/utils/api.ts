@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage, CertificateData, CertificateTemplate, EventData, QuizData, QuizSubmitResult, AssignmentData, ContentItemProgressData, CommentData, SearchResult } from '../types';
+import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage, CertificateData, CertificateTemplate, EventData, QuizData, QuizSubmitResult, AssignmentData, ContentItemProgressData, CommentData, SearchResult, BadgeData, RecommendationData } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -293,6 +293,40 @@ export const searchAPI = {
   search: async (query: string): Promise<SearchResult> => {
     const response = await api.get(`/search?q=${encodeURIComponent(query)}`);
     return response.data;
+  },
+};
+
+export const recommendationsAPI = {
+  get: async (): Promise<{ recommendations: RecommendationData[] }> => {
+    const response = await api.get('/recommendations');
+    return response.data;
+  },
+};
+
+export const badgesAPI = {
+  getMyBadges: async (): Promise<{ badges: BadgeData[]; new_badges: any[] }> => {
+    const response = await api.get('/badges/my');
+    return response.data;
+  },
+
+  // Admin
+  listBadges: async (): Promise<any> => {
+    const response = await api.get('/admin/badges');
+    return response.data;
+  },
+
+  createBadge: async (data: any): Promise<any> => {
+    const response = await api.post('/admin/badges', data);
+    return response.data;
+  },
+
+  updateBadge: async (id: number, data: any): Promise<any> => {
+    const response = await api.put(`/admin/badges/${id}`, data);
+    return response.data;
+  },
+
+  deleteBadge: async (id: number): Promise<void> => {
+    await api.delete(`/admin/badges/${id}`);
   },
 };
 
