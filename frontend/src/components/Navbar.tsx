@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getAuthData, clearAuthData } from '../utils/auth';
-import { LogOut, Shield, LayoutDashboard } from 'lucide-react';
+import { LogOut, Shield, LayoutDashboard, UserCircle } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
@@ -70,7 +70,10 @@ const Navbar: React.FC = () => {
             <LayoutDashboard className="w-4 h-4" /> Dashboard
           </button>
         )}
-        <span className="text-sm text-slate-400">{user.username}</span>
+        <button onClick={() => navigate('/profile')}
+          className="flex items-center gap-1.5 text-slate-400 hover:text-white rounded-full px-3 py-2 text-sm transition-all duration-200">
+          <UserCircle className="w-4 h-4" /> {user.username}
+        </button>
         <button onClick={handleLogout}
           className="flex items-center gap-1.5 text-rose-400 hover:bg-rose-500/10 rounded-full px-3 py-2 text-sm transition-all duration-200">
           <LogOut className="w-4 h-4" /> Logout

@@ -9,6 +9,7 @@ import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
 import VerifyEmail from './components/VerifyEmail';
 import Dashboard from './components/Dashboard';
+import ProfileEdit from './components/ProfileEdit';
 import DayContent from './components/DayContent';
 import AdminDashboard from './components/AdminDashboard';
 import PublicDashboard from './components/PublicDashboard';
@@ -80,6 +81,10 @@ const AppContent: React.FC = () => {
         <Route
           path="/dashboard"
           element={<ProtectedRoute><OnboardingGate><Dashboard /></OnboardingGate></ProtectedRoute>}
+        />
+        <Route
+          path="/profile"
+          element={<ProtectedRoute><OnboardingGate><ProfileEdit /></OnboardingGate></ProtectedRoute>}
         />
         <Route
           path="/day/:dayNumber"

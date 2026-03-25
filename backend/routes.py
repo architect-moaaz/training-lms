@@ -448,6 +448,174 @@ def submit_onboarding():
     return jsonify({'success': True, 'user': user.to_dict(include_companies=True, include_profile=True)}), 200
 
 
+@api.route('/user/profile', methods=['PUT'])
+@jwt_required()
+def update_profile():
+    """Update user profile (post-onboarding edits)"""
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    profile = UserProfile.query.filter_by(user_id=user_id).first()
+    if not profile:
+        return jsonify({'error': 'Complete onboarding first'}), 400
+
+    data = request.get_json()
+    for field in ['full_name', 'phone', 'organization', 'job_title', 'country', 'city',
+                  'experience_level', 'how_did_you_hear', 'learning_goals', 'interests']:
+        if field in data:
+            setattr(profile, field, data[field])
+
+    db.session.commit()
+    return jsonify({'success': True, 'user': user.to_dict(include_companies=True, include_profile=True)}), 200
+
+
+# --- Admin Content Management ---
+
+@api.route('/admin/content/days', methods=['GET'])
+@jwt_required()
+def admin_list_content_days():
+    """List all day folders with their files"""
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user or not user.is_admin:
+        return jsonify({'error': 'Admin access required'}), 403
+
+    public_folder = _get_public_folder()
+    if not os.path.exists(public_folder):
+        return jsonify({'days': []}), 200
+
+    days = []
+    for item in sorted(os.listdir(public_folder)):
+        item_path = os.path.join(public_folder, item)
+        if os.path.isdir(item_path) and item.startswith('day'):
+            try:
+                day_number = int(item.replace('day', ''))
+            except ValueError:
+                continue
+
+            files = []
+            for f in sorted(os.listdir(item_path)):
+                if f == 'metadata.json':
+                    continue
+                fpath = os.path.join(item_path, f)
+                if os.path.isfile(fpath):
+                    files.append({
+                        'name': f,
+                        'size': os.path.getsize(fpath),
+                        'type': 'notebook' if f.endswith('.ipynb') else 'pdf' if f.endswith('.pdf') else 'other',
+                    })
+
+            metadata = {}
+            meta_path = os.path.join(item_path, 'metadata.json')
+            if os.path.exists(meta_path):
+                with open(meta_path, 'r') as mf:
+                    metadata = json.load(mf)
+
+            days.append({
+                'day_number': day_number,
+                'folder': item,
+                'title': metadata.get('title', f'Day {day_number}'),
+                'description': metadata.get('description', ''),
+                'files': files,
+                'metadata': metadata,
+            })
+
+    return jsonify({'days': days}), 200
+
+
+@api.route('/admin/content/days/<int:day_number>/upload', methods=['POST'])
+@jwt_required()
+def admin_upload_content(day_number):
+    """Upload files to a day folder"""
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user or not user.is_admin:
+        return jsonify({'error': 'Admin access required'}), 403
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if not file.filename:
+        return jsonify({'error': 'No file selected'}), 400
+
+    # Validate file extension
+    allowed_extensions = {'.ipynb', '.pdf'}
+    _, ext = os.path.splitext(file.filename.lower())
+    if ext not in allowed_extensions:
+        return jsonify({'error': f'Only .ipynb and .pdf files are allowed, got {ext}'}), 400
+
+    from werkzeug.utils import secure_filename
+    filename = secure_filename(file.filename)
+    if not filename:
+        return jsonify({'error': 'Invalid filename'}), 400
+
+    # Create day folder if needed
+    public_folder = _get_public_folder()
+    day_folder = os.path.join(public_folder, f'day{day_number}')
+    os.makedirs(day_folder, exist_ok=True)
+
+    filepath = os.path.join(day_folder, filename)
+    file.save(filepath)
+
+    return jsonify({'message': f'File {filename} uploaded successfully', 'filename': filename}), 201
+
+
+@api.route('/admin/content/days/<int:day_number>/files/<filename>', methods=['DELETE'])
+@jwt_required()
+def admin_delete_content_file(day_number, filename):
+    """Delete a file from a day folder"""
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user or not user.is_admin:
+        return jsonify({'error': 'Admin access required'}), 403
+
+    # Path traversal check
+    if '/' in filename or '\\' in filename or '..' in filename:
+        return jsonify({'error': 'Invalid filename'}), 400
+
+    public_folder = _get_public_folder()
+    filepath = os.path.join(public_folder, f'day{day_number}', filename)
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'File not found'}), 404
+
+    os.remove(filepath)
+    return jsonify({'message': f'File {filename} deleted'}), 200
+
+
+@api.route('/admin/content/days/<int:day_number>/metadata', methods=['PUT'])
+@jwt_required()
+def admin_update_metadata(day_number):
+    """Update a day's metadata.json"""
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user or not user.is_admin:
+        return jsonify({'error': 'Admin access required'}), 403
+
+    data = request.get_json()
+    public_folder = _get_public_folder()
+    day_folder = os.path.join(public_folder, f'day{day_number}')
+    os.makedirs(day_folder, exist_ok=True)
+
+    meta_path = os.path.join(day_folder, 'metadata.json')
+    existing = {}
+    if os.path.exists(meta_path):
+        with open(meta_path, 'r') as f:
+            existing = json.load(f)
+
+    # Update fields
+    for key in ['title', 'description', 'level', 'videos']:
+        if key in data:
+            existing[key] = data[key]
+
+    with open(meta_path, 'w') as f:
+        json.dump(existing, f, indent=2)
+
+    return jsonify({'message': 'Metadata updated', 'metadata': existing}), 200
+
+
 @api.route('/execute/cell', methods=['POST'])
 @jwt_required()
 def execute_cell():

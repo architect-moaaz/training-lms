@@ -85,6 +85,37 @@ export const authAPI = {
     const response = await api.post('/user/onboarding', data);
     return response.data;
   },
+
+  updateProfile: async (data: Partial<UserProfileData>): Promise<{ success: boolean; user: User }> => {
+    const response = await api.put('/user/profile', data);
+    return response.data;
+  },
+};
+
+export const contentAPI = {
+  getDays: async (): Promise<any> => {
+    const response = await api.get('/admin/content/days');
+    return response.data;
+  },
+
+  uploadFile: async (dayNumber: number, file: File): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post(`/admin/content/days/${dayNumber}/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  deleteFile: async (dayNumber: number, filename: string): Promise<any> => {
+    const response = await api.delete(`/admin/content/days/${dayNumber}/files/${filename}`);
+    return response.data;
+  },
+
+  updateMetadata: async (dayNumber: number, metadata: any): Promise<any> => {
+    const response = await api.put(`/admin/content/days/${dayNumber}/metadata`, metadata);
+    return response.data;
+  },
 };
 
 export const analyticsAPI = {
