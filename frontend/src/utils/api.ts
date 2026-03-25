@@ -33,6 +33,9 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+    if (error.response?.status === 429) {
+      error.response.data = { error: 'Too many requests. Please wait a moment and try again.' };
+    }
     return Promise.reject(error);
   }
 );

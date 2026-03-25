@@ -1,8 +1,10 @@
 import os
 from urllib.parse import quote_plus
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 from models import db
 from routes import api
@@ -58,7 +60,9 @@ allowed_origins = [
     os.environ.get('FRONTEND_URL', 'http://localhost:3001'),
     'http://localhost:3001',
     'http://localhost:3000',
-    'https://training-lms-production-f822.up.railway.app'
+    'https://training-lms-production-f822.up.railway.app',
+    'https://www.spark10k.com',
+    'https://lms.spark10k.com',
 ]
 
 # Initialize extensions
@@ -68,6 +72,48 @@ CORS(app, resources={r"/api/*": {
     "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 }}, supports_credentials=True)
 jwt = JWTManager(app)
+
+# --- Rate Limiting ---
+redis_url = os.environ.get('REDIS_URL', None)
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per minute"],
+    storage_uri=redis_url or "memory://",
+    strategy="fixed-window",
+)
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify(error="Too many requests. Please slow down.", retry_after=e.description), 429
+
+# --- Security Headers ---
+@app.after_request
+def set_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+
+    # HSTS only in production
+    if os.environ.get('FLASK_ENV') != 'development' and os.environ.get('RAILWAY_ENVIRONMENT'):
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+
+    # Content Security Policy
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com; "
+        "style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: blob: https:; "
+        "connect-src 'self' https://cdn.jsdelivr.net https://accounts.google.com https://*.spark10k.com https://training-lms-production.up.railway.app https://training-lms-production-f822.up.railway.app; "
+        "frame-src https://accounts.google.com https://www.youtube.com; "
+        "worker-src 'self' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com"
+    )
+    response.headers['Content-Security-Policy'] = csp
+
+    return response
+
 db.init_app(app)
 
 # JWT error handlers
@@ -86,6 +132,10 @@ def expired_token_callback(jwt_header, jwt_data):
 # Register blueprints
 app.register_blueprint(api, url_prefix='/api')
 
+# --- Apply rate limits to auth endpoints ---
+limiter.limit("5 per minute")(app.view_functions['api.register'])
+limiter.limit("10 per minute")(app.view_functions['api.login'])
+limiter.limit("10 per minute")(app.view_functions['api.google_login'])
 
 @app.route('/')
 def index():
@@ -93,6 +143,7 @@ def index():
 
 
 @app.route('/health')
+@limiter.exempt
 def health():
     return {'status': 'healthy'}, 200
 
