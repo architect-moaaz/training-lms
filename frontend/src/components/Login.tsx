@@ -119,17 +119,22 @@ const Login: React.FC = () => {
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="rememberMe"
-              name="rememberMe"
-              checked={formData.rememberMe}
-              onChange={handleChange}
-              disabled={loading}
-              className="rounded border-white/20 bg-slate-800 text-indigo-500 focus:ring-indigo-500/20"
-            />
-            <label htmlFor="rememberMe" className="text-sm text-slate-400">Remember me</label>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                name="rememberMe"
+                checked={formData.rememberMe}
+                onChange={handleChange}
+                disabled={loading}
+                className="rounded border-white/20 bg-slate-800 text-indigo-500 focus:ring-indigo-500/20"
+              />
+              <label htmlFor="rememberMe" className="text-sm text-slate-400">Remember me</label>
+            </div>
+            <Link to="/forgot-password" className="text-sm text-indigo-400 hover:text-indigo-300">
+              Forgot password?
+            </Link>
           </div>
 
           <button type="submit" className="btn-primary w-full py-3" disabled={loading}>

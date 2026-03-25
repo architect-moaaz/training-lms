@@ -45,6 +45,7 @@ export interface User {
   username: string;
   email: string;
   is_admin: boolean;
+  email_verified: boolean;
   onboarding_completed: boolean;
   created_at: string;
   last_login: string | null;

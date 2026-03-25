@@ -7,13 +7,17 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import (db, User, UserProgress, UserProfile, Company, UserCompany, CompanyDayAccess,
                      Event, FreeResource, UserFreeResourceEnrollment,
                      CoursePackage, CoursePackageDay, CompanyPackageAccess,
-                     CertificateTemplate, Certificate,
+                     CertificateTemplate, Certificate, PasswordResetToken,
                      get_accessible_days_for_user, get_public_days)
-from auth import register_user, login_user, google_login_user
+from auth import register_user, login_user, google_login_user, hash_password
+from email_service import send_password_reset_email, send_verification_email
 from datetime import datetime
+import secrets
 from redis_kernel_manager import RedisKernelManager
 
 api = Blueprint('api', __name__)
+
+
 
 # Redis-based kernel manager (works across multiple Gunicorn workers)
 kernel_manager = RedisKernelManager()
@@ -67,6 +71,97 @@ def google_login():
 
     result, status_code = google_login_user(google_token, ip_address)
     return jsonify(result), status_code
+
+
+@api.route('/auth/forgot-password', methods=['POST'])
+def forgot_password():
+    """Send password reset email. Always returns 200 to prevent user enumeration."""
+    data = request.get_json()
+    email = data.get('email', '').strip().lower()
+
+    if not email:
+        return jsonify({'message': 'If an account with that email exists, a reset link has been sent.'}), 200
+
+    user = User.query.filter_by(email=email).first()
+    if user:
+        # Invalidate any existing unused tokens
+        PasswordResetToken.query.filter_by(user_id=user.id, used=False).update({'used': True})
+
+        token = PasswordResetToken(user_id=user.id)
+        db.session.add(token)
+        db.session.commit()
+
+        frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+        reset_url = f"{frontend_url}/reset-password?token={token.token}"
+        send_password_reset_email(user.email, reset_url)
+
+    return jsonify({'message': 'If an account with that email exists, a reset link has been sent.'}), 200
+
+
+@api.route('/auth/reset-password', methods=['POST'])
+def reset_password():
+    """Reset password using a valid token."""
+    data = request.get_json()
+    token_str = data.get('token', '')
+    new_password = data.get('new_password', '')
+
+    if not token_str or not new_password:
+        return jsonify({'error': 'Token and new password are required'}), 400
+
+    if len(new_password) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+
+    token = PasswordResetToken.query.filter_by(token=token_str).first()
+    if not token or not token.is_valid:
+        return jsonify({'error': 'Invalid or expired reset link. Please request a new one.'}), 400
+
+    user = User.query.get(token.user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    user.password_hash = hash_password(new_password)
+    token.used = True
+    db.session.commit()
+
+    return jsonify({'message': 'Password reset successfully. You can now log in with your new password.'}), 200
+
+
+@api.route('/auth/verify-email/<token>', methods=['GET'])
+def verify_email(token):
+    """Verify a user's email address."""
+    user = User.query.filter_by(email_verification_token=token).first()
+    if not user:
+        return jsonify({'error': 'Invalid verification link'}), 400
+
+    user.email_verified = True
+    user.email_verification_token = None
+    db.session.commit()
+
+    return jsonify({'message': 'Email verified successfully!'}), 200
+
+
+@api.route('/auth/resend-verification', methods=['POST'])
+@jwt_required()
+def resend_verification():
+    """Resend email verification link."""
+    user_id = get_jwt_identity()
+    user = User.query.get(int(user_id))
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if user.email_verified:
+        return jsonify({'message': 'Email is already verified'}), 200
+
+    token = secrets.token_urlsafe(32)
+    user.email_verification_token = token
+    db.session.commit()
+
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+    verify_url = f"{frontend_url}/verify-email?token={token}"
+    send_verification_email(user.email, verify_url)
+
+    return jsonify({'message': 'Verification email sent'}), 200
 
 
 def _get_public_folder():

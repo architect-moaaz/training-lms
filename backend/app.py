@@ -136,6 +136,9 @@ app.register_blueprint(api, url_prefix='/api')
 limiter.limit("5 per minute")(app.view_functions['api.register'])
 limiter.limit("10 per minute")(app.view_functions['api.login'])
 limiter.limit("10 per minute")(app.view_functions['api.google_login'])
+limiter.limit("3 per minute")(app.view_functions['api.forgot_password'])
+limiter.limit("3 per minute")(app.view_functions['api.reset_password'])
+limiter.limit("2 per minute")(app.view_functions['api.resend_verification'])
 
 @app.route('/')
 def index():

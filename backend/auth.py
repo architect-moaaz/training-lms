@@ -1,11 +1,13 @@
 import os
 import uuid
+import secrets
 import bcrypt
 import requests
 from flask_jwt_extended import create_access_token, create_refresh_token
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from models import db, User, Company, UserCompany
+from email_service import send_verification_email, send_welcome_email
 from datetime import datetime
 
 
@@ -88,12 +90,15 @@ def register_user(username, email, password, ip_address=None, invite_code=None):
     # Get location from IP
     location = get_location_from_ip(ip_address) if ip_address else {'country': 'Unknown', 'city': 'Unknown'}
 
-    # Create new user
+    # Create new user with email verification token
     password_hash = hash_password(password)
+    verification_token = secrets.token_urlsafe(32)
     new_user = User(
         username=username,
         email=email,
         password_hash=password_hash,
+        email_verified=False,
+        email_verification_token=verification_token,
         registration_ip=ip_address,
         registration_country=location.get('country'),
         registration_city=location.get('city')
@@ -110,6 +115,12 @@ def register_user(username, email, password, ip_address=None, invite_code=None):
     _assign_companies_by_email_domain(new_user)
 
     db.session.commit()
+
+    # Send verification and welcome emails (non-blocking — failures don't break registration)
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+    verify_url = f"{frontend_url}/verify-email?token={verification_token}"
+    send_verification_email(email, verify_url)
+    send_welcome_email(email, username)
 
     # Generate tokens
     access_token = create_access_token(identity=str(new_user.id))
@@ -166,6 +177,7 @@ def google_login_user(google_token, ip_address=None):
             username=username,
             email=email,
             password_hash=random_password,
+            email_verified=True,  # Google already verified their email
             registration_ip=ip_address,
             registration_country=location.get('country'),
             registration_city=location.get('city')

@@ -1,7 +1,8 @@
 import re
 import uuid
+import secrets
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timedelta
 
 db = SQLAlchemy()
 
@@ -14,6 +15,8 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
+    email_verified = db.Column(db.Boolean, default=False)
+    email_verification_token = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
 
@@ -37,6 +40,7 @@ class User(db.Model):
             'username': self.username,
             'email': self.email,
             'is_admin': self.is_admin,
+            'email_verified': self.email_verified,
             'onboarding_completed': self.onboarding_completed,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None
@@ -418,6 +422,27 @@ class Certificate(db.Model):
             'certificate_title': self.certificate_title,
             'issued_at': self.issued_at.isoformat() if self.issued_at else None,
         }
+
+
+class PasswordResetToken(db.Model):
+    __tablename__ = 'password_reset_tokens'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    token = db.Column(db.String(255), unique=True, nullable=False, default=lambda: secrets.token_urlsafe(32))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, default=lambda: datetime.utcnow() + timedelta(hours=1))
+    used = db.Column(db.Boolean, default=False)
+
+    user = db.relationship('User', backref=db.backref('reset_tokens', lazy=True))
+
+    @property
+    def is_expired(self):
+        return datetime.utcnow() > self.expires_at
+
+    @property
+    def is_valid(self):
+        return not self.used and not self.is_expired
 
 
 def get_accessible_days_for_user(user_id):
