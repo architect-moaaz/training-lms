@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { getAuthData, clearAuthData } from '../utils/auth';
 import { LogOut, Shield, LayoutDashboard, UserCircle } from 'lucide-react';
 import SearchBar from './SearchBar';
+import ThemeToggle from './ThemeToggle';
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ const Navbar: React.FC = () => {
   }
 
   return (
-    <nav className="bg-slate-900/80 backdrop-blur-xl border-b border-white/10 px-6 py-3 flex items-center justify-between">
+    <nav className="bg-slate-900/80 backdrop-blur-xl border-b border-white/10 px-6 py-3 flex items-center justify-between" role="navigation" aria-label="Main navigation">
       <Brand onClick={() => navigate('/dashboard')} />
 
       <div className="flex-1 text-center">
@@ -60,6 +61,7 @@ const Navbar: React.FC = () => {
 
       <div className="flex items-center gap-3">
         <SearchBar />
+        <ThemeToggle />
         {user.is_admin && location.pathname !== '/admin' && (
           <button onClick={() => navigate('/admin')}
             className="flex items-center gap-1.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 rounded-full px-4 py-2 text-sm transition-all duration-200">
@@ -76,7 +78,7 @@ const Navbar: React.FC = () => {
           className="flex items-center gap-1.5 text-slate-400 hover:text-white rounded-full px-3 py-2 text-sm transition-all duration-200">
           <UserCircle className="w-4 h-4" /> {user.username}
         </button>
-        <button onClick={handleLogout}
+        <button onClick={handleLogout} aria-label="Log out"
           className="flex items-center gap-1.5 text-rose-400 hover:bg-rose-500/10 rounded-full px-3 py-2 text-sm transition-all duration-200">
           <LogOut className="w-4 h-4" /> Logout
         </button>

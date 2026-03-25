@@ -3,10 +3,31 @@
 @tailwind utilities;
 
 @layer base {
+  /* Dark mode (default) */
   body {
     @apply bg-slate-950 text-slate-50 antialiased;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
       'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  }
+
+  /* Light mode */
+  .light body,
+  body.light {
+    @apply bg-slate-50 text-slate-900;
+  }
+
+  .light {
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --input-bg: rgba(241, 245, 249, 0.8);
+    --input-border: rgba(0, 0, 0, 0.1);
+  }
+
+  .dark, :root {
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --input-bg: rgba(30, 41, 59, 0.5);
+    --input-border: rgba(255, 255, 255, 0.1);
   }
 
   code {
@@ -24,11 +45,31 @@
 
 @layer components {
   .glass-card {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    @apply backdrop-blur-xl rounded-2xl;
+  }
+
+  .light .glass-card {
+    @apply shadow-sm;
   }
 
   .glass-card-hover {
-    @apply glass-card transition-all duration-300 hover:bg-white/10 hover:border-indigo-500/30;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    @apply backdrop-blur-xl rounded-2xl transition-all duration-300;
+  }
+
+  .glass-card-hover:hover {
+    @apply shadow-md;
+  }
+
+  .dark .glass-card-hover:hover {
+    @apply bg-white/10 border-indigo-500/30;
+  }
+
+  .light .glass-card-hover:hover {
+    @apply bg-white border-indigo-300;
   }
 
   .btn-primary {
@@ -37,7 +78,15 @@
   }
 
   .btn-ghost {
-    @apply text-slate-400 hover:text-white hover:bg-white/5 rounded-xl px-4 py-2 transition-all duration-200;
+    @apply rounded-xl px-4 py-2 transition-all duration-200;
+  }
+
+  .dark .btn-ghost {
+    @apply text-slate-400 hover:text-white hover:bg-white/5;
+  }
+
+  .light .btn-ghost {
+    @apply text-slate-500 hover:text-slate-900 hover:bg-slate-100;
   }
 
   .btn-danger {
@@ -46,12 +95,77 @@
   }
 
   .input-field {
-    @apply w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-slate-50
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    @apply w-full rounded-xl px-4 py-3
            placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2
            focus:ring-indigo-500/20 transition-all duration-200;
+  }
+
+  .dark .input-field {
+    @apply text-slate-50;
+  }
+
+  .light .input-field {
+    @apply text-slate-900;
   }
 
   .error-banner {
     @apply bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl px-4 py-3 mb-4;
   }
+}
+
+/* Light mode global overrides */
+.light {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.light nav {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+.light .text-white {
+  color: #0f172a;
+}
+
+.light .text-slate-200,
+.light .text-slate-100 {
+  color: #1e293b;
+}
+
+.light .text-slate-300 {
+  color: #334155;
+}
+
+.light .text-slate-400 {
+  color: #64748b;
+}
+
+.light .text-slate-500 {
+  color: #94a3b8;
+}
+
+.light .bg-slate-950,
+.light .bg-slate-900 {
+  background-color: #f8fafc;
+}
+
+.light .bg-slate-800\/50,
+.light .bg-slate-800\/40,
+.light .bg-slate-800\/30,
+.light .bg-slate-800\/60,
+.light .bg-slate-800 {
+  background-color: rgba(241, 245, 249, 0.8);
+}
+
+.light .border-white\/5,
+.light .border-white\/10 {
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.light select {
+  background-color: #f1f5f9;
+  color: #0f172a;
 }

@@ -142,11 +142,11 @@ const DayContent: React.FC = () => {
 
   return (
     <div className="flex-1 px-6 py-8 max-w-5xl mx-auto w-full">
-      <button onClick={() => navigate('/dashboard')} className="btn-ghost mb-4 flex items-center gap-2 text-sm">
+      <button onClick={() => navigate('/dashboard')} className="btn-ghost mb-4 flex items-center gap-2 text-sm" aria-label="Back to Dashboard">
         <ArrowLeft className="w-4 h-4" /> Back to Dashboard
       </button>
 
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-6" role="banner">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-2xl font-bold text-white">Day {content.day_number}: {content.title}</h1>

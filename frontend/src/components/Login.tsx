@@ -62,10 +62,10 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+    <main className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden" aria-label="Login page">
       {/* Background gradient blobs */}
-      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-violet-500/20 rounded-full blur-3xl" />
+      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl" aria-hidden="true" />
+      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-violet-500/20 rounded-full blur-3xl" aria-hidden="true" />
 
       <div className="glass-card p-8 w-full max-w-md animate-slide-up relative z-10">
         <div className="flex items-center justify-center mb-3">
@@ -74,7 +74,7 @@ const Login: React.FC = () => {
         <h1 className="text-2xl font-bold text-center text-white mb-1">Welcome Back</h1>
         <p className="text-slate-400 text-center text-sm mb-6">Login to continue your learning journey</p>
 
-        {error && <div className="error-banner text-sm mb-4">{error}</div>}
+        {error && <div className="error-banner text-sm mb-4" role="alert">{error}</div>}
 
         <div className="flex justify-center mb-4">
           <GoogleLogin
@@ -158,7 +158,7 @@ const Login: React.FC = () => {
           </Link>
         </p>
       </div>
-    </div>
+    </main>
   );
 };
 

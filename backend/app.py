@@ -6,6 +6,7 @@ from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
+from flasgger import Swagger
 from models import db
 from routes import api
 
@@ -66,11 +67,15 @@ allowed_origins = [
 ]
 
 # Initialize extensions
-CORS(app, resources={r"/api/*": {
-    "origins": allowed_origins,
-    "allow_headers": ["Content-Type", "Authorization"],
-    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-}}, supports_credentials=True)
+CORS(app, resources={
+    r"/api/*": {
+        "origins": allowed_origins,
+        "allow_headers": ["Content-Type", "Authorization"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    },
+    r"/apispec*": {"origins": "*"},
+    r"/flasgger_static/*": {"origins": "*"},
+}, supports_credentials=True)
 jwt = JWTManager(app)
 
 # --- Rate Limiting ---
@@ -128,6 +133,34 @@ def unauthorized_callback(error):
 @jwt.expired_token_loader
 def expired_token_callback(jwt_header, jwt_data):
     return {'error': 'Token has expired'}, 401
+
+# --- API Documentation (Swagger) ---
+swagger_config = {
+    "headers": [],
+    "specs": [{"endpoint": "apispec", "route": "/apispec.json"}],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/api/docs/",
+}
+swagger_template = {
+    "info": {
+        "title": "Spark10K LMS API",
+        "description": "API documentation for the Spark10K Learning Management System",
+        "version": "1.0.0",
+        "contact": {"email": "contact@spark10k.com"},
+    },
+    "securityDefinitions": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "JWT token. Format: Bearer <token>",
+        }
+    },
+    "security": [{"Bearer": []}],
+    "basePath": "/api",
+}
+Swagger(app, config=swagger_config, template=swagger_template)
 
 # Register blueprints
 app.register_blueprint(api, url_prefix='/api')

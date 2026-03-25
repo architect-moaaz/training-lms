@@ -21,6 +21,7 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { isAuthenticated, getAuthData } from './utils/auth';
 import { usePageTracking } from './hooks/usePageTracking';
+import { useTheme } from './hooks/useTheme';
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 
@@ -40,6 +41,7 @@ const NAVBAR_HIDDEN_PREFIXES = ['/verify/', '/verify-email', '/reset-password', 
 
 const AppContent: React.FC = () => {
   usePageTracking();
+  useTheme(); // Initialize theme on mount
   const location = useLocation();
   const { user } = getAuthData();
   const showNavbar = !PAGES_WITHOUT_NAVBAR.includes(location.pathname)
@@ -49,8 +51,12 @@ const AppContent: React.FC = () => {
 
   return (
     <>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:bg-indigo-600 focus:text-white focus:px-4 focus:py-2 focus:rounded-lg">
+        Skip to main content
+      </a>
       {showNavbar && <Navbar />}
       {showVerificationBanner && <EmailVerificationBanner />}
+      <div id="main-content">
       <Routes>
         {/* ── Public landing pages ── */}
         <Route
@@ -102,6 +108,7 @@ const AppContent: React.FC = () => {
         {/* ── Catch-all ── */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </div>
     </>
   );
 };

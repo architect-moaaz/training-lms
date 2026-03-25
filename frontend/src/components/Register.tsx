@@ -72,7 +72,7 @@ const Register: React.FC = () => {
         <h1 className="text-2xl font-bold text-center text-white mb-1">Create Account</h1>
         <p className="text-slate-400 text-center text-sm mb-6">Join our Learning Management System</p>
 
-        {error && <div className="error-banner text-sm mb-4">{error}</div>}
+        {error && <div className="error-banner text-sm mb-4" role="alert">{error}</div>}
 
         <div className="flex justify-center mb-4">
           <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setError('Google login failed.')} text="signup_with" />

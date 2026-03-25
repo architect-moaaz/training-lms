@@ -29,7 +29,25 @@ kernel_manager = RedisKernelManager()
 
 @api.route('/auth/register', methods=['POST'])
 def register():
-    """Register a new user"""
+    """Register a new user
+    ---
+    tags: [Auth]
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [username, email, password]
+          properties:
+            username: {type: string}
+            email: {type: string}
+            password: {type: string}
+            invite_code: {type: string}
+    responses:
+      201: {description: Registration successful}
+      400: {description: Validation error}
+    """
     data = request.get_json()
     username = data.get('username')
     email = data.get('email')
@@ -48,7 +66,23 @@ def register():
 
 @api.route('/auth/login', methods=['POST'])
 def login():
-    """Login a user"""
+    """Login a user
+    ---
+    tags: [Auth]
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [emailOrUsername, password]
+          properties:
+            emailOrUsername: {type: string}
+            password: {type: string}
+    responses:
+      200: {description: Login successful, returns JWT tokens}
+      401: {description: Invalid credentials}
+    """
     data = request.get_json()
     email_or_username = data.get('emailOrUsername') or data.get('email') or data.get('username')
     password = data.get('password')
@@ -62,7 +96,22 @@ def login():
 
 @api.route('/auth/google', methods=['POST'])
 def google_login():
-    """Login or register via Google OAuth"""
+    """Login or register via Google OAuth
+    ---
+    tags: [Auth]
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [credential]
+          properties:
+            credential: {type: string, description: Google OAuth ID token}
+    responses:
+      200: {description: Login successful}
+      401: {description: Invalid token}
+    """
     data = request.get_json()
     google_token = data.get('credential')
     if not google_token:
@@ -238,7 +287,13 @@ def get_public_days_list():
 @api.route('/days', methods=['GET'])
 @jwt_required()
 def get_days():
-    """Get all available days with content metadata"""
+    """Get all available days with content metadata
+    ---
+    tags: [Content]
+    security: [{Bearer: []}]
+    responses:
+      200: {description: List of accessible days}
+    """
     user_id = int(get_jwt_identity())
     accessible_days = get_accessible_days_for_user(user_id)
     days = _scan_days(allowed_day_numbers=accessible_days)
@@ -266,7 +321,20 @@ def _auto_track_progress(user_id, day_number):
 @api.route('/days/<int:day_number>/content', methods=['GET'])
 @jwt_required()
 def get_day_content(day_number):
-    """Get content for a specific day"""
+    """Get content for a specific day
+    ---
+    tags: [Content]
+    security: [{Bearer: []}]
+    parameters:
+      - in: path
+        name: day_number
+        type: integer
+        required: true
+    responses:
+      200: {description: Day content with notebooks, PDFs, videos}
+      403: {description: Access denied}
+      404: {description: Day not found}
+    """
     user_id = int(get_jwt_identity())
     access_error = _check_day_access(user_id, day_number)
     if access_error:
@@ -367,7 +435,13 @@ def get_pdf(day_number, filename):
 @api.route('/progress', methods=['GET'])
 @jwt_required()
 def get_progress():
-    """Get user's progress across all days"""
+    """Get user's progress across all days
+    ---
+    tags: [Progress]
+    security: [{Bearer: []}]
+    responses:
+      200: {description: Array of progress records}
+    """
     user_id = int(get_jwt_identity())
 
     progress = UserProgress.query.filter_by(user_id=user_id).all()
@@ -414,7 +488,14 @@ def update_progress(day_number):
 @api.route('/user/me', methods=['GET'])
 @jwt_required()
 def get_current_user():
-    """Get current user info"""
+    """Get current user info
+    ---
+    tags: [User]
+    security: [{Bearer: []}]
+    responses:
+      200: {description: Current user with profile and companies}
+      404: {description: User not found}
+    """
     user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
 
