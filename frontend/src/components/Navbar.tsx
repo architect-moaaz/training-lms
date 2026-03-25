@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getAuthData, clearAuthData } from '../utils/auth';
 import { LogOut, Shield, LayoutDashboard, UserCircle } from 'lucide-react';
+import SearchBar from './SearchBar';
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
@@ -58,6 +59,7 @@ const Navbar: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-3">
+        <SearchBar />
         {user.is_admin && location.pathname !== '/admin' && (
           <button onClick={() => navigate('/admin')}
             className="flex items-center gap-1.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 rounded-full px-4 py-2 text-sm transition-all duration-200">

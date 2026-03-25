@@ -628,6 +628,36 @@ class ContentItemProgress(db.Model):
         }
 
 
+class Comment(db.Model):
+    __tablename__ = 'comments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    day_number = db.Column(db.Integer, nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey('comments.id'), nullable=True)
+    content = db.Column(db.Text, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('comments', lazy=True))
+    replies = db.relationship('Comment', backref=db.backref('parent', remote_side=[id], lazy=True),
+                              lazy=True, order_by='Comment.created_at')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'username': self.user.username if self.user else 'Unknown',
+            'day_number': self.day_number,
+            'parent_id': self.parent_id,
+            'content': self.content if not self.is_deleted else '[deleted]',
+            'is_deleted': self.is_deleted,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
 class PasswordResetToken(db.Model):
     __tablename__ = 'password_reset_tokens'
 

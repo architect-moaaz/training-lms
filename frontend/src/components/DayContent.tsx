@@ -6,6 +6,7 @@ import NotebookViewer from './NotebookViewer';
 import PDFViewer from './PDFViewer';
 import QuizViewer from './QuizViewer';
 import AssignmentSubmit from './AssignmentSubmit';
+import CommentSection from './CommentSection';
 import { ArrowLeft, Play, BookOpen, FileText, ChevronRight, Check, ClipboardList, FileUp } from 'lucide-react';
 
 const getYouTubeEmbedUrl = (url: string): string | null => {
@@ -265,6 +266,11 @@ const DayContent: React.FC = () => {
         {content.notebooks.length === 0 && content.pdfs.length === 0 && (!content.videos || content.videos.length === 0) && !quiz && !assignment && (
           <div className="text-center py-12 text-slate-400">No content available for this day yet.</div>
         )}
+
+        {/* Discussion */}
+        <section>
+          <CommentSection dayNumber={dayNum} />
+        </section>
       </div>
     </div>
   );

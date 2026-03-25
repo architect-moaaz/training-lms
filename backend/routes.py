@@ -9,7 +9,7 @@ from models import (db, User, UserProgress, UserProfile, Company, UserCompany, C
                      CoursePackage, CoursePackageDay, CompanyPackageAccess,
                      CertificateTemplate, Certificate, PasswordResetToken,
                      Quiz, QuizQuestion, QuizAttempt,
-                     Assignment, Submission, ContentItemProgress,
+                     Assignment, Submission, ContentItemProgress, Comment,
                      get_accessible_days_for_user, get_public_days)
 from auth import register_user, login_user, google_login_user, hash_password
 from email_service import send_password_reset_email, send_verification_email
@@ -1992,3 +1992,136 @@ def update_item_progress(day_number):
 
     db.session.commit()
     return jsonify(item.to_dict()), 200
+
+
+# ── Comments / Discussion ──
+
+@api.route('/days/<int:day_number>/comments', methods=['GET'])
+@jwt_required()
+def get_day_comments(day_number):
+    comments = Comment.query.filter_by(day_number=day_number)\
+        .order_by(Comment.created_at.asc()).all()
+    return jsonify({'comments': [c.to_dict() for c in comments]}), 200
+
+
+@api.route('/days/<int:day_number>/comments', methods=['POST'])
+@jwt_required()
+def create_comment(day_number):
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+    content = data.get('content', '').strip()
+    if not content:
+        return jsonify({'error': 'Comment cannot be empty'}), 400
+
+    comment = Comment(
+        user_id=user_id,
+        day_number=day_number,
+        parent_id=data.get('parent_id'),
+        content=content,
+    )
+    db.session.add(comment)
+    db.session.commit()
+    return jsonify(comment.to_dict()), 201
+
+
+@api.route('/comments/<int:comment_id>', methods=['PUT'])
+@jwt_required()
+def update_comment(comment_id):
+    user_id = int(get_jwt_identity())
+    comment = Comment.query.get(comment_id)
+    if not comment:
+        return jsonify({'error': 'Comment not found'}), 404
+    if comment.user_id != user_id:
+        return jsonify({'error': 'Cannot edit another user\'s comment'}), 403
+
+    data = request.get_json()
+    content = data.get('content', '').strip()
+    if not content:
+        return jsonify({'error': 'Comment cannot be empty'}), 400
+
+    comment.content = content
+    comment.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify(comment.to_dict()), 200
+
+
+@api.route('/comments/<int:comment_id>', methods=['DELETE'])
+@jwt_required()
+def delete_comment(comment_id):
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    comment = Comment.query.get(comment_id)
+    if not comment:
+        return jsonify({'error': 'Comment not found'}), 404
+    if comment.user_id != user_id and not (user and user.is_admin):
+        return jsonify({'error': 'Not authorized'}), 403
+
+    comment.is_deleted = True
+    comment.content = '[deleted]'
+    db.session.commit()
+    return jsonify({'success': True}), 200
+
+
+# ── Search ──
+
+@api.route('/search', methods=['GET'])
+@jwt_required()
+def search():
+    user_id = int(get_jwt_identity())
+    query = request.args.get('q', '').strip().lower()
+    if not query or len(query) < 2:
+        return jsonify({'days': [], 'resources': []}), 200
+
+    accessible_days = get_accessible_days_for_user(user_id)
+
+    # Search days via metadata
+    day_results = []
+    public_folder = _get_public_folder()
+    if os.path.exists(public_folder):
+        for item in sorted(os.listdir(public_folder)):
+            item_path = os.path.join(public_folder, item)
+            if not os.path.isdir(item_path) or not item.startswith('day'):
+                continue
+            try:
+                day_num = int(item.replace('day', ''))
+            except ValueError:
+                continue
+            if accessible_days is not None and day_num not in accessible_days:
+                continue
+
+            meta_path = os.path.join(item_path, 'metadata.json')
+            title = f'Day {day_num}'
+            description = ''
+            if os.path.exists(meta_path):
+                with open(meta_path, 'r') as f:
+                    meta = json.load(f)
+                    title = meta.get('title', title)
+                    description = meta.get('description', '')
+
+            if query in title.lower() or query in description.lower():
+                day_results.append({
+                    'day_number': day_num,
+                    'title': title,
+                    'description': description,
+                    'type': 'day',
+                })
+
+    # Search free resources
+    resource_results = []
+    resources = FreeResource.query.all()
+    for r in resources:
+        searchable = f"{r.title} {r.description or ''} {r.instructor or ''} {r.category or ''}".lower()
+        if query in searchable:
+            resource_results.append({
+                'id': r.id,
+                'title': r.title,
+                'description': r.description,
+                'instructor': r.instructor,
+                'type': 'resource',
+            })
+
+    return jsonify({
+        'days': day_results[:10],
+        'resources': resource_results[:10],
+        'total': len(day_results) + len(resource_results),
+    }), 200

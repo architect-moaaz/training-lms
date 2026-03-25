@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage, CertificateData, CertificateTemplate, EventData, QuizData, QuizSubmitResult, AssignmentData, ContentItemProgressData } from '../types';
+import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage, CertificateData, CertificateTemplate, EventData, QuizData, QuizSubmitResult, AssignmentData, ContentItemProgressData, CommentData, SearchResult } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -264,6 +264,34 @@ export const assignmentAPI = {
 
   reviewSubmission: async (id: number, data: { grade: string; feedback: string }): Promise<any> => {
     const response = await api.put(`/admin/submissions/${id}/review`, data);
+    return response.data;
+  },
+};
+
+export const commentsAPI = {
+  getComments: async (dayNumber: number): Promise<CommentData[]> => {
+    const response = await api.get(`/days/${dayNumber}/comments`);
+    return response.data.comments;
+  },
+
+  createComment: async (dayNumber: number, content: string, parentId?: number): Promise<CommentData> => {
+    const response = await api.post(`/days/${dayNumber}/comments`, { content, parent_id: parentId });
+    return response.data;
+  },
+
+  updateComment: async (commentId: number, content: string): Promise<CommentData> => {
+    const response = await api.put(`/comments/${commentId}`, { content });
+    return response.data;
+  },
+
+  deleteComment: async (commentId: number): Promise<void> => {
+    await api.delete(`/comments/${commentId}`);
+  },
+};
+
+export const searchAPI = {
+  search: async (query: string): Promise<SearchResult> => {
+    const response = await api.get(`/search?q=${encodeURIComponent(query)}`);
     return response.data;
   },
 };

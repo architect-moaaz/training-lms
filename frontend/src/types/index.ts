@@ -249,6 +249,24 @@ export interface ContentItemProgressData {
   last_accessed: string;
 }
 
+export interface CommentData {
+  id: number;
+  user_id: number;
+  username: string;
+  day_number: number;
+  parent_id: number | null;
+  content: string;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SearchResult {
+  days: { day_number: number; title: string; description: string; type: string }[];
+  resources: { id: number; title: string; description: string; instructor: string; type: string }[];
+  total: number;
+}
+
 export interface NotebookCell {
   cell_type: 'code' | 'markdown' | 'raw';
   source: string | string[];
