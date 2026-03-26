@@ -4,6 +4,7 @@ import { getAuthData, clearAuthData } from '../utils/auth';
 import { LogOut, Shield, LayoutDashboard, UserCircle } from 'lucide-react';
 import SearchBar from './SearchBar';
 import ThemeToggle from './ThemeToggle';
+import LanguageSelector from './LanguageSelector';
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
@@ -61,6 +62,7 @@ const Navbar: React.FC = () => {
 
       <div className="flex items-center gap-3">
         <SearchBar />
+        <LanguageSelector />
         <ThemeToggle />
         {user.is_admin && location.pathname !== '/admin' && (
           <button onClick={() => navigate('/admin')}

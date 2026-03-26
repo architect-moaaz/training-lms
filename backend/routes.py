@@ -11,8 +11,10 @@ from models import (db, User, UserProgress, UserProfile, Company, UserCompany, C
                      Quiz, QuizQuestion, QuizAttempt,
                      Assignment, Submission, ContentItemProgress, Comment,
                      BadgeDefinition, UserBadge,
+                     SubscriptionPlan, UserSubscription, PaymentLog,
                      get_accessible_days_for_user, get_public_days)
 import csv
+import stripe
 from auth import register_user, login_user, google_login_user, hash_password
 from email_service import send_password_reset_email, send_verification_email
 from datetime import datetime
@@ -2448,5 +2450,239 @@ def admin_delete_badge(badge_id):
     if not badge:
         return jsonify({'error': 'Badge not found'}), 404
     db.session.delete(badge)
+    db.session.commit()
+    return jsonify({'success': True}), 200
+
+
+# ── Payments / Subscriptions ──
+
+def _init_stripe():
+    stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '')
+
+
+@api.route('/public/plans', methods=['GET'])
+def get_public_plans():
+    """Get all active subscription plans (no auth required)"""
+    plans = SubscriptionPlan.query.filter_by(is_active=True).order_by(SubscriptionPlan.price_cents).all()
+    return jsonify({'plans': [p.to_dict() for p in plans]}), 200
+
+
+@api.route('/payments/create-checkout', methods=['POST'])
+@jwt_required()
+def create_checkout():
+    """Create a Stripe Checkout session"""
+    _init_stripe()
+    if not stripe.api_key:
+        return jsonify({'error': 'Payment system not configured'}), 503
+
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    data = request.get_json()
+    plan_id = data.get('plan_id')
+    plan = SubscriptionPlan.query.get(plan_id)
+    if not plan or not plan.is_active:
+        return jsonify({'error': 'Plan not found'}), 404
+
+    if not plan.stripe_price_id:
+        return jsonify({'error': 'Plan not configured for payments'}), 400
+
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+
+    try:
+        checkout_params = {
+            'payment_method_types': ['card'],
+            'line_items': [{'price': plan.stripe_price_id, 'quantity': 1}],
+            'success_url': f"{frontend_url}/checkout-success?session_id={{CHECKOUT_SESSION_ID}}",
+            'cancel_url': f"{frontend_url}/pricing",
+            'client_reference_id': str(user_id),
+            'metadata': {'plan_id': str(plan.id), 'user_id': str(user_id)},
+        }
+
+        if plan.billing_period in ('monthly', 'yearly'):
+            checkout_params['mode'] = 'subscription'
+        else:
+            checkout_params['mode'] = 'payment'
+
+        # Reuse or create Stripe customer
+        existing_sub = UserSubscription.query.filter_by(user_id=user_id).first()
+        if existing_sub and existing_sub.stripe_customer_id:
+            checkout_params['customer'] = existing_sub.stripe_customer_id
+        else:
+            checkout_params['customer_email'] = user.email
+
+        session = stripe.checkout.Session.create(**checkout_params)
+
+        # Log
+        log = PaymentLog(
+            user_id=user_id,
+            stripe_session_id=session.id,
+            amount_cents=plan.price_cents,
+            currency=plan.currency,
+            status='pending',
+        )
+        db.session.add(log)
+        db.session.commit()
+
+        return jsonify({'checkout_url': session.url, 'session_id': session.id}), 200
+
+    except stripe.error.StripeError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@api.route('/payments/webhook', methods=['POST'])
+def stripe_webhook():
+    """Handle Stripe webhook events (no JWT — uses Stripe signature)"""
+    _init_stripe()
+    payload = request.get_data(as_text=True)
+    sig_header = request.headers.get('Stripe-Signature')
+    webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+
+    try:
+        if webhook_secret:
+            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+        else:
+            event = json.loads(payload)
+    except (ValueError, stripe.error.SignatureVerificationError):
+        return jsonify({'error': 'Invalid signature'}), 400
+
+    event_type = event.get('type', '')
+    data_obj = event.get('data', {}).get('object', {})
+
+    if event_type == 'checkout.session.completed':
+        session_id = data_obj.get('id')
+        user_id = int(data_obj.get('metadata', {}).get('user_id', 0))
+        plan_id = int(data_obj.get('metadata', {}).get('plan_id', 0))
+        customer_id = data_obj.get('customer')
+        subscription_id = data_obj.get('subscription')
+
+        if user_id and plan_id:
+            plan = SubscriptionPlan.query.get(plan_id)
+            sub = UserSubscription(
+                user_id=user_id,
+                plan_id=plan_id,
+                stripe_subscription_id=subscription_id,
+                stripe_customer_id=customer_id,
+                status='active',
+                current_period_start=datetime.utcnow(),
+            )
+            db.session.add(sub)
+
+            # Grant package access if plan has a package
+            if plan and plan.package_id:
+                existing = CompanyPackageAccess.query.filter_by(package_id=plan.package_id).first()
+                if not existing:
+                    # Grant all days in the package directly
+                    pkg_days = CoursePackageDay.query.filter_by(package_id=plan.package_id).all()
+                    for pd in pkg_days:
+                        # Check user's companies and grant via first company, or create a direct progress record
+                        pass  # Package access is handled via get_accessible_days_for_user
+
+            # Update payment log
+            PaymentLog.query.filter_by(stripe_session_id=session_id).update({'status': 'completed'})
+            db.session.commit()
+
+    elif event_type == 'customer.subscription.deleted':
+        subscription_id = data_obj.get('id')
+        sub = UserSubscription.query.filter_by(stripe_subscription_id=subscription_id).first()
+        if sub:
+            sub.status = 'cancelled'
+            db.session.commit()
+
+    elif event_type == 'invoice.payment_failed':
+        subscription_id = data_obj.get('subscription')
+        sub = UserSubscription.query.filter_by(stripe_subscription_id=subscription_id).first()
+        if sub:
+            sub.status = 'past_due'
+            db.session.commit()
+
+    return jsonify({'received': True}), 200
+
+
+@api.route('/payments/my-subscriptions', methods=['GET'])
+@jwt_required()
+def get_my_subscriptions():
+    user_id = int(get_jwt_identity())
+    subs = UserSubscription.query.filter_by(user_id=user_id).order_by(UserSubscription.created_at.desc()).all()
+    return jsonify({'subscriptions': [s.to_dict() for s in subs]}), 200
+
+
+@api.route('/payments/cancel', methods=['POST'])
+@jwt_required()
+def cancel_subscription():
+    _init_stripe()
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+    sub_id = data.get('subscription_id')
+
+    sub = UserSubscription.query.get(sub_id)
+    if not sub or sub.user_id != user_id:
+        return jsonify({'error': 'Subscription not found'}), 404
+
+    if sub.stripe_subscription_id and stripe.api_key:
+        try:
+            stripe.Subscription.modify(sub.stripe_subscription_id, cancel_at_period_end=True)
+        except stripe.error.StripeError as e:
+            return jsonify({'error': str(e)}), 400
+
+    sub.status = 'cancelled'
+    db.session.commit()
+    return jsonify({'message': 'Subscription cancelled', 'subscription': sub.to_dict()}), 200
+
+
+# ── Admin Subscription Plans ──
+
+@api.route('/admin/subscription-plans', methods=['GET'])
+@admin_required
+def admin_list_plans():
+    plans = SubscriptionPlan.query.all()
+    return jsonify({'plans': [p.to_dict() for p in plans]}), 200
+
+
+@api.route('/admin/subscription-plans', methods=['POST'])
+@admin_required
+def admin_create_plan():
+    data = request.get_json()
+    plan = SubscriptionPlan(
+        name=data['name'],
+        description=data.get('description', ''),
+        price_cents=data.get('price_cents', 0),
+        currency=data.get('currency', 'inr'),
+        billing_period=data.get('billing_period', 'monthly'),
+        stripe_price_id=data.get('stripe_price_id', ''),
+        package_id=data.get('package_id'),
+        features=json.dumps(data.get('features', [])),
+    )
+    db.session.add(plan)
+    db.session.commit()
+    return jsonify(plan.to_dict()), 201
+
+
+@api.route('/admin/subscription-plans/<int:plan_id>', methods=['PUT'])
+@admin_required
+def admin_update_plan(plan_id):
+    plan = SubscriptionPlan.query.get(plan_id)
+    if not plan:
+        return jsonify({'error': 'Plan not found'}), 404
+    data = request.get_json()
+    for field in ['name', 'description', 'price_cents', 'currency', 'billing_period',
+                  'stripe_price_id', 'package_id', 'is_active']:
+        if field in data:
+            setattr(plan, field, data[field])
+    if 'features' in data:
+        plan.features = json.dumps(data['features'])
+    db.session.commit()
+    return jsonify(plan.to_dict()), 200
+
+
+@api.route('/admin/subscription-plans/<int:plan_id>', methods=['DELETE'])
+@admin_required
+def admin_delete_plan(plan_id):
+    plan = SubscriptionPlan.query.get(plan_id)
+    if not plan:
+        return jsonify({'error': 'Plan not found'}), 404
+    db.session.delete(plan)
     db.session.commit()
     return jsonify({'success': True}), 200

@@ -249,6 +249,32 @@ export interface ContentItemProgressData {
   last_accessed: string;
 }
 
+export interface SubscriptionPlanData {
+  id: number;
+  name: string;
+  description: string;
+  price_cents: number;
+  price_display: string;
+  currency: string;
+  billing_period: string;
+  stripe_price_id: string;
+  package_id: number | null;
+  features: string[];
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface UserSubscriptionData {
+  id: number;
+  user_id: number;
+  plan_id: number;
+  plan_name: string;
+  status: string;
+  stripe_subscription_id: string;
+  current_period_end: string | null;
+  created_at: string;
+}
+
 export interface BadgeData {
   id: number;
   user_id: number;

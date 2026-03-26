@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage, CertificateData, CertificateTemplate, EventData, QuizData, QuizSubmitResult, AssignmentData, ContentItemProgressData, CommentData, SearchResult, BadgeData, RecommendationData } from '../types';
+import { AuthResponse, Day, DayContent, UserProgress, Notebook, User, UserProfileData, Company, CompanyMember, FreeResource, CoursePackage, CertificateData, CertificateTemplate, EventData, QuizData, QuizSubmitResult, AssignmentData, ContentItemProgressData, CommentData, SearchResult, BadgeData, RecommendationData, SubscriptionPlanData, UserSubscriptionData } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -327,6 +327,48 @@ export const badgesAPI = {
 
   deleteBadge: async (id: number): Promise<void> => {
     await api.delete(`/admin/badges/${id}`);
+  },
+};
+
+export const paymentsAPI = {
+  getPlans: async (): Promise<{ plans: SubscriptionPlanData[] }> => {
+    const response = await api.get('/public/plans');
+    return response.data;
+  },
+
+  createCheckout: async (planId: number): Promise<{ checkout_url: string; session_id: string }> => {
+    const response = await api.post('/payments/create-checkout', { plan_id: planId });
+    return response.data;
+  },
+
+  getMySubscriptions: async (): Promise<{ subscriptions: UserSubscriptionData[] }> => {
+    const response = await api.get('/payments/my-subscriptions');
+    return response.data;
+  },
+
+  cancelSubscription: async (subscriptionId: number): Promise<any> => {
+    const response = await api.post('/payments/cancel', { subscription_id: subscriptionId });
+    return response.data;
+  },
+
+  // Admin
+  listPlans: async (): Promise<any> => {
+    const response = await api.get('/admin/subscription-plans');
+    return response.data;
+  },
+
+  createPlan: async (data: any): Promise<any> => {
+    const response = await api.post('/admin/subscription-plans', data);
+    return response.data;
+  },
+
+  updatePlan: async (id: number, data: any): Promise<any> => {
+    const response = await api.put(`/admin/subscription-plans/${id}`, data);
+    return response.data;
+  },
+
+  deletePlan: async (id: number): Promise<void> => {
+    await api.delete(`/admin/subscription-plans/${id}`);
   },
 };
 

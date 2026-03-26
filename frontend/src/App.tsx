@@ -16,6 +16,8 @@ import PublicDashboard from './components/PublicDashboard';
 import Onboarding from './components/Onboarding';
 import FreeResourceViewer from './components/FreeResourceViewer';
 import VerifyCertificate from './components/VerifyCertificate';
+import PricingPage from './components/PricingPage';
+import CheckoutSuccess from './components/CheckoutSuccess';
 import EmailVerificationBanner from './components/EmailVerificationBanner';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -81,6 +83,7 @@ const AppContent: React.FC = () => {
 
         {/* ── Public ── */}
         <Route path="/browse" element={<PublicDashboard />} />
+        <Route path="/pricing" element={<PricingPage />} />
         <Route path="/verify/:certId" element={<VerifyCertificate />} />
 
         {/* ── Protected ── */}
@@ -99,6 +102,10 @@ const AppContent: React.FC = () => {
         <Route
           path="/resource/:resourceId"
           element={<ProtectedRoute><OnboardingGate><FreeResourceViewer /></OnboardingGate></ProtectedRoute>}
+        />
+        <Route
+          path="/checkout-success"
+          element={<ProtectedRoute><CheckoutSuccess /></ProtectedRoute>}
         />
         <Route
           path="/admin"

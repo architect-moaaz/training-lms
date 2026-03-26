@@ -628,6 +628,83 @@ class ContentItemProgress(db.Model):
         }
 
 
+class SubscriptionPlan(db.Model):
+    __tablename__ = 'subscription_plans'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+    price_cents = db.Column(db.Integer, nullable=False)
+    currency = db.Column(db.String(3), default='inr')
+    billing_period = db.Column(db.String(20), default='monthly')  # monthly, yearly, one_time
+    stripe_price_id = db.Column(db.String(255), nullable=True)
+    package_id = db.Column(db.Integer, db.ForeignKey('course_packages.id'), nullable=True)
+    features = db.Column(db.Text, default='[]')  # JSON array of feature strings
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    package = db.relationship('CoursePackage', backref=db.backref('subscription_plans', lazy=True))
+
+    def to_dict(self):
+        import json
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'price_cents': self.price_cents,
+            'price_display': f"₹{self.price_cents / 100:.0f}" if self.currency == 'inr' else f"${self.price_cents / 100:.2f}",
+            'currency': self.currency,
+            'billing_period': self.billing_period,
+            'stripe_price_id': self.stripe_price_id,
+            'package_id': self.package_id,
+            'features': json.loads(self.features) if self.features else [],
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class UserSubscription(db.Model):
+    __tablename__ = 'user_subscriptions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    plan_id = db.Column(db.Integer, db.ForeignKey('subscription_plans.id'), nullable=False)
+    stripe_subscription_id = db.Column(db.String(255), nullable=True)
+    stripe_customer_id = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(20), default='active')  # active, cancelled, past_due, trialing
+    current_period_start = db.Column(db.DateTime, nullable=True)
+    current_period_end = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('subscriptions', lazy=True))
+    plan = db.relationship('SubscriptionPlan', backref=db.backref('subscriptions', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'plan_id': self.plan_id,
+            'plan_name': self.plan.name if self.plan else '',
+            'status': self.status,
+            'stripe_subscription_id': self.stripe_subscription_id,
+            'current_period_end': self.current_period_end.isoformat() if self.current_period_end else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class PaymentLog(db.Model):
+    __tablename__ = 'payment_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    stripe_payment_intent_id = db.Column(db.String(255), nullable=True)
+    stripe_session_id = db.Column(db.String(255), nullable=True)
+    amount_cents = db.Column(db.Integer, default=0)
+    currency = db.Column(db.String(3), default='inr')
+    status = db.Column(db.String(20), default='pending')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class BadgeDefinition(db.Model):
     __tablename__ = 'badge_definitions'
 
