@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { enrollmentAPI } from '../utils/api';
 import { FreeResource } from '../types';
+import YouTubePlayer from './YouTubePlayer';
 import { ArrowLeft, Check, Clock, User, ExternalLink } from 'lucide-react';
 
-const getYouTubeEmbedUrl = (url: string): string | null => {
+const getYouTubeVideoId = (url: string): string | null => {
   const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
-  if (shortMatch) return `https://www.youtube.com/embed/${shortMatch[1]}`;
+  if (shortMatch) return shortMatch[1];
   const longMatch = url.match(/[?&]v=([a-zA-Z0-9_-]+)/);
-  if (longMatch) return `https://www.youtube.com/embed/${longMatch[1]}`;
+  if (longMatch) return longMatch[1];
   return null;
 };
 
@@ -25,6 +26,7 @@ const FreeResourceViewer: React.FC = () => {
   const [enrollment, setEnrollment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [autoCompleted, setAutoCompleted] = useState(false);
 
   useEffect(() => {
     if (resourceId) fetchResource();
@@ -43,11 +45,13 @@ const FreeResourceViewer: React.FC = () => {
     }
   };
 
-  const handleMarkComplete = async () => {
-    if (!resource) return;
+  const handleVideoEnded = async () => {
+    if (!resource || enrollment?.completed) return;
     try {
       const updated = await enrollmentAPI.markComplete(resource.id);
       setEnrollment(updated);
+      setAutoCompleted(true);
+      setTimeout(() => setAutoCompleted(false), 5000);
     } catch {}
   };
 
@@ -64,7 +68,7 @@ const FreeResourceViewer: React.FC = () => {
     );
   }
 
-  const embedUrl = getYouTubeEmbedUrl(resource.url);
+  const videoId = getYouTubeVideoId(resource.url);
 
   return (
     <div className="flex-1 px-6 py-8 max-w-5xl mx-auto w-full">
@@ -94,29 +98,30 @@ const FreeResourceViewer: React.FC = () => {
             )}
           </div>
         </div>
-        <button onClick={handleMarkComplete}
-          className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-200 shrink-0
-            ${enrollment?.completed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>
-          {enrollment?.completed && <Check className="w-4 h-4" />}
-          {enrollment?.completed ? 'Completed' : 'Mark as Complete'}
-        </button>
+        {enrollment?.completed && (
+          <span className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+            <Check className="w-4 h-4" /> Completed
+          </span>
+        )}
       </div>
+
+      {/* Auto-complete notification */}
+      {autoCompleted && (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl px-4 py-3 text-sm mb-4 flex items-center gap-2 animate-fade-in" role="alert">
+          <Check className="w-4 h-4" /> Course automatically marked as complete!
+        </div>
+      )}
 
       {resource.description && (
         <p className="text-slate-400 mb-6">{resource.description}</p>
       )}
 
-      {embedUrl ? (
-        <div className="relative w-full pb-[56.25%] bg-black rounded-2xl overflow-hidden">
-          <iframe
-            src={embedUrl}
-            title={resource.title}
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="absolute inset-0 w-full h-full"
-          />
-        </div>
+      {videoId ? (
+        <YouTubePlayer
+          videoId={videoId}
+          title={resource.title}
+          onEnded={handleVideoEnded}
+        />
       ) : (
         <div className="glass-card p-8 text-center">
           <p className="text-slate-300 mb-4">This course opens in a new tab.</p>

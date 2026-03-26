@@ -7,13 +7,14 @@ import PDFViewer from './PDFViewer';
 import QuizViewer from './QuizViewer';
 import AssignmentSubmit from './AssignmentSubmit';
 import CommentSection from './CommentSection';
+import YouTubePlayer from './YouTubePlayer';
 import { ArrowLeft, Play, BookOpen, FileText, ChevronRight, Check, ClipboardList, FileUp } from 'lucide-react';
 
-const getYouTubeEmbedUrl = (url: string): string | null => {
+const getYouTubeVideoId = (url: string): string | null => {
   const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
-  if (shortMatch) return `https://www.youtube.com/embed/${shortMatch[1]}`;
+  if (shortMatch) return shortMatch[1];
   const longMatch = url.match(/[?&]v=([a-zA-Z0-9_-]+)/);
-  if (longMatch) return `https://www.youtube.com/embed/${longMatch[1]}`;
+  if (longMatch) return longMatch[1];
   return null;
 };
 
@@ -93,11 +94,25 @@ const DayContent: React.FC = () => {
   };
 
   const handleVideoClick = (video: VideoContent) => {
-    if (getYouTubeEmbedUrl(video.url)) {
+    if (getYouTubeVideoId(video.url)) {
       setSelectedVideo(video); setSelectedNotebook(null); setSelectedPDF(null);
     } else {
       window.open(video.url, '_blank', 'noopener,noreferrer');
     }
+  };
+
+  const handleVideoEnded = async () => {
+    if (!selectedVideo) return;
+    // Track as completed via granular progress
+    try {
+      await progressAPI.updateItemProgress(dayNum, {
+        item_type: 'video',
+        item_identifier: selectedVideo.title,
+        completed: true,
+        progress_pct: 100,
+      });
+      fetchItemProgress();
+    } catch {}
   };
 
   const handleClose = () => { setSelectedNotebook(null); setSelectedPDF(null); setSelectedVideo(null); };
@@ -121,21 +136,36 @@ const DayContent: React.FC = () => {
   if (selectedPDF) return <PDFViewer dayNumber={dayNum} filename={selectedPDF} onClose={handleClose} />;
 
   if (selectedVideo) {
-    const embedUrl = getYouTubeEmbedUrl(selectedVideo.url);
+    const videoId = getYouTubeVideoId(selectedVideo.url);
+    const videoCompleted = itemProgress.some(
+      p => p.item_type === 'video' && p.item_identifier === selectedVideo.title && p.completed
+    );
     return (
       <div className="flex-1 px-6 py-8 max-w-5xl mx-auto w-full">
         <button onClick={handleClose} className="btn-ghost mb-4 flex items-center gap-2 text-sm">
           <ArrowLeft className="w-4 h-4" /> Back to Content
         </button>
-        <h1 className="text-2xl font-bold text-white mb-2">{selectedVideo.title}</h1>
-        {selectedVideo.instructor && (
-          <p className="text-slate-400 text-sm mb-4">{selectedVideo.instructor} &middot; {selectedVideo.duration}</p>
-        )}
-        <div className="relative w-full pb-[56.25%] bg-black rounded-2xl overflow-hidden">
-          <iframe src={embedUrl || ''} title={selectedVideo.title} frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen
-            className="absolute inset-0 w-full h-full" />
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white mb-1">{selectedVideo.title}</h1>
+            {selectedVideo.instructor && (
+              <p className="text-slate-400 text-sm">{selectedVideo.instructor} &middot; {selectedVideo.duration}</p>
+            )}
+          </div>
+          {videoCompleted && (
+            <span className="flex items-center gap-1.5 text-sm text-emerald-400 bg-emerald-500/10 rounded-full px-4 py-2 border border-emerald-500/20">
+              <Check className="w-4 h-4" /> Watched
+            </span>
+          )}
         </div>
+        {videoId ? (
+          <YouTubePlayer videoId={videoId} title={selectedVideo.title} onEnded={handleVideoEnded} />
+        ) : (
+          <div className="glass-card p-8 text-center">
+            <p className="text-slate-300">Video cannot be embedded.</p>
+          </div>
+        )}
+        <p className="text-xs text-slate-600 mt-3">Video will be marked as watched when it finishes playing.</p>
       </div>
     );
   }
