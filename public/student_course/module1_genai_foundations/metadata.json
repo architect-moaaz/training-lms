@@ -1,0 +1,6 @@
+{
+  "day_number": 101,
+  "title": "Module 1 — GenAI Foundations",
+  "description": "AI/ML/DL/GenAI distinctions, the LLM training lifecycle, prompt engineering, evaluation, ethics, and provider APIs. Capstone: build a Structured Insight Extractor with a real eval harness.",
+  "level": "Foundations"
+}

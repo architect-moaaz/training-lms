@@ -1,0 +1,6 @@
+{
+  "day_number": 106,
+  "title": "Final Capstone — Personal Learning Coach",
+  "description": "Compose every module into one production system: a fine-tuned classifier, a RAG knowledge core, an MCP tool layer, and a LangGraph multi-agent loop with full observability.",
+  "level": "Capstone"
+}

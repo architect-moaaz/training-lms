@@ -1,0 +1,6 @@
+{
+  "day_number": 102,
+  "title": "Module 2 — LLMs & Fine-Tuning",
+  "description": "Fine-tuning fundamentals, LoRA/QLoRA, PEFT, quantization, distillation, instruction tuning, RLHF intuition. Capstone: fine-tune a 7B model on a domain dataset and quantize for local inference.",
+  "level": "Intermediate"
+}

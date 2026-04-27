@@ -1,0 +1,6 @@
+{
+  "day_number": 104,
+  "title": "Module 4 — Model Context Protocol (MCP)",
+  "description": "MCP fundamentals, server development (resources, tools, prompts), client integration with Claude Desktop / Code. Capstone: ship an MCP Tool Pack that exposes the Spark10K LMS to any MCP-aware client.",
+  "level": "Advanced"
+}

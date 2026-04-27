@@ -1,0 +1,6 @@
+{
+  "day_number": 103,
+  "title": "Module 3 — LangChain & RAG",
+  "description": "LangChain core abstractions, document processing, embeddings, vector DBs, RAG pipelines, advanced retrieval (hybrid, rerank, multi-query). Capstone: a cited Enterprise Knowledge Assistant graded with retrieval and faithfulness metrics.",
+  "level": "Intermediate"
+}

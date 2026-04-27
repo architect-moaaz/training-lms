@@ -228,51 +228,99 @@ def _get_public_folder():
     return public_folder
 
 
+def _discover_day_folders():
+    """Return a mapping {day_number: absolute_folder_path}.
+
+    Discovery rules:
+      1. Top-level `public/dayN/` folders — day_number from the folder name.
+      2. Any other top-level folder is treated as a *course bucket* and is
+         walked one level deep. Each sub-folder containing a `metadata.json`
+         with a numeric `day_number` is registered. This lets nested courses
+         (e.g. `public/student_course/module1_.../`) plug in without touching
+         the existing `dayN` numbering.
+    """
+    public_folder = _get_public_folder()
+    if not os.path.exists(public_folder):
+        return {}
+
+    mapping = {}
+    for item in sorted(os.listdir(public_folder)):
+        item_path = os.path.join(public_folder, item)
+        if not os.path.isdir(item_path):
+            continue
+
+        # Case 1 — legacy top-level dayN folder.
+        if item.startswith('day'):
+            try:
+                mapping[int(item.replace('day', ''))] = item_path
+                continue
+            except ValueError:
+                pass  # fall through to bucket scan
+
+        # Case 2 — course bucket, recurse one level for explicit day_number.
+        try:
+            sub_items = sorted(os.listdir(item_path))
+        except OSError:
+            continue
+        for sub in sub_items:
+            sub_path = os.path.join(item_path, sub)
+            if not os.path.isdir(sub_path):
+                continue
+            meta_path = os.path.join(sub_path, 'metadata.json')
+            if not os.path.exists(meta_path):
+                continue
+            try:
+                with open(meta_path, 'r') as f:
+                    meta = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue
+            n = meta.get('day_number')
+            if isinstance(n, int):
+                mapping[n] = sub_path
+    return mapping
+
+
+def _resolve_day_path(day_number):
+    """Return the on-disk folder for a day_number, or None if unknown."""
+    return _discover_day_folders().get(day_number)
+
+
 def _scan_days(allowed_day_numbers=None):
     """Scan filesystem for day folders. If allowed_day_numbers is None, return all days.
     If it's a set, filter to only those days."""
-    public_folder = _get_public_folder()
-    if not os.path.exists(public_folder):
-        return []
-
+    folders = _discover_day_folders()
     days = []
-    for item in sorted(os.listdir(public_folder)):
-        item_path = os.path.join(public_folder, item)
-        if os.path.isdir(item_path) and item.startswith('day'):
-            try:
-                day_number = int(item.replace('day', ''))
-            except ValueError:
-                continue
+    for day_number in sorted(folders.keys()):
+        if allowed_day_numbers is not None and day_number not in allowed_day_numbers:
+            continue
+        item_path = folders[day_number]
 
-            if allowed_day_numbers is not None and day_number not in allowed_day_numbers:
-                continue
+        notebooks = []
+        pdfs = []
+        for file in os.listdir(item_path):
+            if file.endswith('.ipynb'):
+                notebooks.append(file)
+            elif file.endswith('.pdf'):
+                pdfs.append(file)
 
-            notebooks = []
-            pdfs = []
-            for file in os.listdir(item_path):
-                if file.endswith('.ipynb'):
-                    notebooks.append(file)
-                elif file.endswith('.pdf'):
-                    pdfs.append(file)
+        metadata_path = os.path.join(item_path, 'metadata.json')
+        metadata = {}
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
 
-            metadata_path = os.path.join(item_path, 'metadata.json')
-            metadata = {}
-            if os.path.exists(metadata_path):
-                with open(metadata_path, 'r') as f:
-                    metadata = json.load(f)
+        videos = metadata.get('videos', [])
 
-            videos = metadata.get('videos', [])
-
-            days.append({
-                'day_number': day_number,
-                'title': metadata.get('title', f'Day {day_number}'),
-                'description': metadata.get('description', ''),
-                'notebooks': len(notebooks),
-                'pdfs': len(pdfs),
-                'videos': len(videos),
-                'total_resources': len(notebooks) + len(pdfs) + len(videos),
-                'level': metadata.get('level', ''),
-            })
+        days.append({
+            'day_number': day_number,
+            'title': metadata.get('title', f'Day {day_number}'),
+            'description': metadata.get('description', ''),
+            'notebooks': len(notebooks),
+            'pdfs': len(pdfs),
+            'videos': len(videos),
+            'total_resources': len(notebooks) + len(pdfs) + len(videos),
+            'level': metadata.get('level', ''),
+        })
     return days
 
 
@@ -342,10 +390,8 @@ def get_day_content(day_number):
     if access_error:
         return access_error
 
-    public_folder = _get_public_folder()
-    day_folder = os.path.join(public_folder, f'day{day_number}')
-
-    if not os.path.exists(day_folder):
+    day_folder = _resolve_day_path(day_number)
+    if not day_folder or not os.path.exists(day_folder):
         return jsonify({'error': 'Day not found'}), 404
 
     # Auto-track progress on content access
@@ -396,13 +442,14 @@ def get_notebook(day_number, filename):
     if access_error:
         return access_error
 
-    public_folder = _get_public_folder()
-    notebook_path = os.path.join(public_folder, f'day{day_number}', filename)
-
     # Security: validate filename to prevent directory traversal
     if not filename.endswith('.ipynb') or '/' in filename or '\\' in filename:
         return jsonify({'error': 'Invalid filename'}), 400
 
+    day_folder = _resolve_day_path(day_number)
+    if not day_folder:
+        return jsonify({'error': 'Day not found'}), 404
+    notebook_path = os.path.join(day_folder, filename)
     if not os.path.exists(notebook_path):
         return jsonify({'error': 'Notebook not found'}), 404
 
@@ -421,13 +468,14 @@ def get_pdf(day_number, filename):
     if access_error:
         return access_error
 
-    public_folder = _get_public_folder()
-    pdf_path = os.path.join(public_folder, f'day{day_number}', filename)
-
     # Security: validate filename to prevent directory traversal
     if not filename.endswith('.pdf') or '/' in filename or '\\' in filename:
         return jsonify({'error': 'Invalid filename'}), 400
 
+    day_folder = _resolve_day_path(day_number)
+    if not day_folder:
+        return jsonify({'error': 'Day not found'}), 404
+    pdf_path = os.path.join(day_folder, filename)
     if not os.path.exists(pdf_path):
         return jsonify({'error': 'PDF not found'}), 404
 
@@ -639,9 +687,11 @@ def admin_upload_content(day_number):
     if not filename:
         return jsonify({'error': 'Invalid filename'}), 400
 
-    # Create day folder if needed
-    public_folder = _get_public_folder()
-    day_folder = os.path.join(public_folder, f'day{day_number}')
+    # Resolve existing folder (handles nested modules); fall back to creating
+    # a fresh top-level dayN/ when this is a brand-new day_number.
+    day_folder = _resolve_day_path(day_number)
+    if not day_folder:
+        day_folder = os.path.join(_get_public_folder(), f'day{day_number}')
     os.makedirs(day_folder, exist_ok=True)
 
     filepath = os.path.join(day_folder, filename)
@@ -663,8 +713,10 @@ def admin_delete_content_file(day_number, filename):
     if '/' in filename or '\\' in filename or '..' in filename:
         return jsonify({'error': 'Invalid filename'}), 400
 
-    public_folder = _get_public_folder()
-    filepath = os.path.join(public_folder, f'day{day_number}', filename)
+    day_folder = _resolve_day_path(day_number)
+    if not day_folder:
+        return jsonify({'error': 'Day not found'}), 404
+    filepath = os.path.join(day_folder, filename)
     if not os.path.exists(filepath):
         return jsonify({'error': 'File not found'}), 404
 
@@ -682,8 +734,9 @@ def admin_update_metadata(day_number):
         return jsonify({'error': 'Admin access required'}), 403
 
     data = request.get_json()
-    public_folder = _get_public_folder()
-    day_folder = os.path.join(public_folder, f'day{day_number}')
+    day_folder = _resolve_day_path(day_number)
+    if not day_folder:
+        day_folder = os.path.join(_get_public_folder(), f'day{day_number}')
     os.makedirs(day_folder, exist_ok=True)
 
     meta_path = os.path.join(day_folder, 'metadata.json')

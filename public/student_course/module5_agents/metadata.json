@@ -1,0 +1,6 @@
+{
+  "day_number": 105,
+  "title": "Module 5 — AI Agents",
+  "description": "Agent architecture, ReAct, tool use, multi-agent collaboration, LangGraph state machines, orchestration. Capstone: an Autonomous Research Analyst graded on success rate, plan quality, observability, and guardrails.",
+  "level": "Advanced"
+}
